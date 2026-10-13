@@ -7,9 +7,11 @@ use App\Http\Controllers\Api\V1\RoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-    // Public Auth
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/login', [AuthController::class, 'login']);
+    // Public Auth with Rate Limiting (Brute Force Protection)
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/auth/register', [AuthController::class, 'register']);
+        Route::post('/auth/login', [AuthController::class, 'login']);
+    });
 
     // Public Properties & Rooms
     Route::get('/properties', [PropertyController::class, 'index']);

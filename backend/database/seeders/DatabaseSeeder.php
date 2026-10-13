@@ -39,31 +39,55 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 3. Receptionist / Kasir
+        // 3. Manager / Pengelola Cabang
+        $manager = User::updateOrCreate(
+            ['email' => 'manager@simkos.id'],
+            [
+                'name' => 'Bambang Manager',
+                'phone' => '081100000003',
+                'password' => Hash::make('Password123!'),
+                'role' => Role::MANAGER,
+                'is_active' => true,
+            ]
+        );
+
+        // 4. Receptionist / Kasir
         $receptionist = User::updateOrCreate(
             ['email' => 'resepsionis@simkos.id'],
             [
                 'name' => 'Siti Resepsionis',
-                'phone' => '081100000003',
+                'phone' => '081100000004',
                 'password' => Hash::make('Password123!'),
                 'role' => Role::RECEPTIONIST,
                 'is_active' => true,
             ]
         );
 
-        // 4. Tenant / Penyewa
+        // 5. Staff Maintenance & Housekeeping
+        $staff = User::updateOrCreate(
+            ['email' => 'staff@simkos.id'],
+            [
+                'name' => 'Joko Housekeeping',
+                'phone' => '081100000005',
+                'password' => Hash::make('Password123!'),
+                'role' => Role::STAFF,
+                'is_active' => true,
+            ]
+        );
+
+        // 6. Tenant / Penyewa
         $tenant = User::updateOrCreate(
             ['email' => 'penyewa@simkos.id'],
             [
                 'name' => 'Rizky Mahasiswa',
-                'phone' => '081100000004',
+                'phone' => '081100000006',
                 'password' => Hash::make('Password123!'),
                 'role' => Role::TENANT,
                 'is_active' => true,
             ]
         );
 
-        // 5. Sample Property: Wisma Melati Harmoni
+        // 7. Sample Property: Wisma Melati Harmoni
         $property = Property::updateOrCreate(
             ['code' => 'PROP-MLG-01'],
             [
@@ -82,10 +106,12 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Hubungkan Owner ke Properti
+        // Hubungkan Staf Cabang ke Properti
         $property->users()->syncWithoutDetaching([
             $owner->id => ['role' => 'owner'],
+            $manager->id => ['role' => 'manager'],
             $receptionist->id => ['role' => 'receptionist'],
+            $staff->id => ['role' => 'staff'],
         ]);
 
         // 6. Room Types

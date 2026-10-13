@@ -21,6 +21,9 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Sinkronisasi baseUrl jika berubah saat runtime
+          options.baseUrl = ApiEndpoints.baseUrl;
+
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token');
           if (token != null && token.isNotEmpty) {
@@ -28,7 +31,12 @@ class ApiClient {
           }
           return handler.next(options);
         },
-        onError: (DioException error, handler) {
+        onError: (DioException error, handler) async {
+          // Otomatis hapus token lokal jika server menolak dengan 401 Unauthorized
+          if (error.response?.statusCode == 401) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('auth_token');
+          }
           return handler.next(error);
         },
       ),

@@ -22,15 +22,22 @@ backend/node_modules/
 backend/public/storage
 backend/public/hot
 backend/public/build
+# Environment & Secrets (Universal)
+.env
+.env.*
+.env.backup
+.env.production
+!.env.example
+!*.example
+!**/.env.example
+!**/.env.*.example
+
 backend/storage/*.key
 backend/storage/pail
 backend/storage/framework/cache/*
 backend/storage/framework/sessions/*
 backend/storage/framework/views/*
 backend/storage/logs/*.log
-backend/.env
-backend/.env.backup
-backend/.env.production
 backend/.phpunit.result.cache
 backend/.phpunit.cache
 backend/database/database.sqlite

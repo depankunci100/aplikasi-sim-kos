@@ -1,11 +1,38 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class ApiEndpoints {
-  // Gunakan IP 10.0.2.2 jika di Android Emulator, atau localhost jika di iOS/Desktop
+  static String? _customBaseUrl;
+
+  /// Memungkinkan pengaturan Base URL kustom saat runtime (misal dari layar pengaturan IP)
+  static void setCustomBaseUrl(String? url) {
+    _customBaseUrl = url;
+  }
+
+  /// Menentukan Base URL secara adaptif:
+  /// 1. Nilai kustom runtime jika disetel
+  /// 2. Nilai compile-time via --dart-define=API_BASE_URL=http://<IP_KOMPUTER>:8000/api/v1
+  /// 3. Default otomatis:
+  ///    - Android Emulator: http://10.0.2.2:8000/api/v1
+  ///    - iOS Simulator / macOS / Desktop: http://127.0.0.1:8000/api/v1
+  ///    - Web: http://localhost:8000/api/v1
   static String get baseUrl {
-    if (Platform.isAndroid) {
+    if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
+      return _customBaseUrl!;
+    }
+
+    const envUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
+
+    if (kIsWeb) {
+      return 'http://localhost:8000/api/v1';
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:8000/api/v1';
     }
+
     return 'http://127.0.0.1:8000/api/v1';
   }
 
