@@ -1,0 +1,68 @@
+services:
+  app:
+    build:
+      context: ../../
+      dockerfile: infra/docker/Dockerfile.backend
+    container_name: simkos_backend_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ../../backend:/var/www/html
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-simkos_db}
+      - DB_USERNAME=${DB_USERNAME:-simkos_user}
+      - DB_PASSWORD=${DB_PASSWORD:-simkos_secret}
+    networks:
+      - simkos_network
+    depends_on:
+      - db
+
+  webserver:
+    image: nginx:alpine
+    container_name: simkos_webserver
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ../../backend:/var/www/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - simkos_network
+    depends_on:
+      - app
+
+  db:
+    image: mariadb:10.11
+    container_name: simkos_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-simkos_db}
+      MYSQL_USER: ${DB_USERNAME:-simkos_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-simkos_secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret}
+    ports:
+      - "3306:3306"
+    volumes:
+      - simkos_db_data:/var/lib/mysql
+    networks:
+      - simkos_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: simkos_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - simkos_network
+
+networks:
+  simkos_network:
+    driver: bridge
+
+volumes:
+  simkos_db_data:
+    driver: local
