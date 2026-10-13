@@ -93,6 +93,10 @@ class PaymentVerificationController extends Controller
         $user = Auth::user();
         $payment = Payment::with('invoice')->findOrFail($id);
 
+        if (!$this->paymentService->canAccessPaymentProof($payment, $user)) {
+            abort(403, 'Anda tidak memiliki hak akses untuk memverifikasi pembayaran properti ini.');
+        }
+
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
@@ -111,6 +115,10 @@ class PaymentVerificationController extends Controller
     {
         $user = Auth::user();
         $payment = Payment::with('invoice')->findOrFail($id);
+
+        if (!$this->paymentService->canAccessPaymentProof($payment, $user)) {
+            abort(403, 'Anda tidak memiliki hak akses untuk menolak pembayaran properti ini.');
+        }
 
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'min:5', 'max:500'],

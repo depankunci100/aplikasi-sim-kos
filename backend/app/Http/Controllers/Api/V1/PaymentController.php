@@ -102,6 +102,10 @@ class PaymentController extends ApiController
             return $this->errorResponse('Data pembayaran tidak ditemukan.', 404);
         }
 
+        if (!$this->paymentService->canAccessPaymentProof($payment, $verifier)) {
+            return $this->errorResponse('Anda tidak memiliki kewenangan verifikasi pada properti cabang ini.', 403);
+        }
+
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
@@ -126,6 +130,10 @@ class PaymentController extends ApiController
         $payment = Payment::with('invoice')->find($id);
         if (!$payment) {
             return $this->errorResponse('Data pembayaran tidak ditemukan.', 404);
+        }
+
+        if (!$this->paymentService->canAccessPaymentProof($payment, $verifier)) {
+            return $this->errorResponse('Anda tidak memiliki kewenangan verifikasi pada properti cabang ini.', 403);
         }
 
         $validated = $request->validate([

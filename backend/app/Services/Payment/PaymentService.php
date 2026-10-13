@@ -114,12 +114,16 @@ class PaymentService
             // Rekalkulasi total bayar terverifikasi & status invoice
             $invoice->syncPaidAmountAndStatus();
 
-            // Rental Lifecycle: Jika invoice sewa/deposit telah lunas, perbarui status booking ke CONFIRMED
-            if ($invoice->isPaid() && $invoice->booking_id) {
+            // Rental Lifecycle: Jika invoice lunas ATAU pembayaran terverifikasi mencukupi DP (Deposit),
+            // perbarui status booking dari PENDING ke CONFIRMED
+            if ($invoice->booking_id) {
                 $booking = Booking::where('id', $invoice->booking_id)->lockForUpdate()->first();
                 if ($booking && $booking->status === BookingStatus::PENDING) {
-                    $booking->status = BookingStatus::CONFIRMED;
-                    $booking->save();
+                    $minPayment = $booking->deposit_amount > 0 ? $booking->deposit_amount : ($booking->total_amount * 0.3);
+                    if ($invoice->isPaid() || (float)$invoice->paid_amount >= (float)$minPayment) {
+                        $booking->status = BookingStatus::CONFIRMED;
+                        $booking->save();
+                    }
                 }
             }
 
