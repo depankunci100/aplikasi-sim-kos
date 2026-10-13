@@ -15,12 +15,16 @@ class Payment extends Model
         'invoice_id',
         'user_id',
         'payment_method',
+        'payment_provider',
         'amount',
+        'sender_name',
+        'sender_bank',
         'proof_photo',
         'status',
         'verified_by',
         'verified_at',
         'rejection_reason',
+        'verification_notes',
     ];
 
     protected $casts = [
@@ -41,5 +45,20 @@ class Payment extends Model
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isVerified(): bool
+    {
+        return $this->status === 'verified';
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->status === 'rejected';
     }
 }

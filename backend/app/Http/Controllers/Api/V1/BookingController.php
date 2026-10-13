@@ -101,6 +101,7 @@ class BookingController extends ApiController
                 // Terbitkan invoice pertama (biaya sewa + deposit)
                 Invoice::create([
                     'invoice_number' => 'INV-' . date('Ymd') . '-' . strtoupper(Str::random(5)),
+                    'property_id' => $room->property_id,
                     'booking_id' => $booking->id,
                     'user_id' => $request->user()->id,
                     'invoice_type' => 'rent',

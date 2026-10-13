@@ -54,5 +54,9 @@ Keterangan:
    Manager, Resepsionis, dan Staff hanya memiliki akses mutasi data pada cabang properti tempat mereka ditugaskan.
 3. **Tenant Data Boundary**:
    Penyewa (`tenant`) divalidasi secara ketat oleh Middleware bahwa `booking.user_id == auth()->id()`, sehingga tidak dimungkinkan melihat invoice, bukti pembayaran, maupun profil KTP penghuni lain.
-4. **Audit Trail**:
-   Aksi kritis seperti verifikasi pembayaran, pembatalan booking, perubahan harga kamar, dan persetujuan pengeluaran dicatat dengan cap `user_id` dan `timestamp`.
+4. **Larangan Verifikasi Finansial Mandiri (No Self-Verification)**:
+   Penyewa tidak dapat memverifikasi pembayarannya sendiri meskipun mengirim payload verifikasi langsung ke server. Sistem melempar `403 Forbidden` (`Anda tidak dapat memverifikasi pembayaran Anda sendiri`).
+5. **Staff Operational Boundary**:
+   Staf operasional (housekeeping/maintenance) tidak memiliki wewenang finansial untuk melihat saldo kasir atau memverifikasi pembayaran bukti transfer.
+6. **Audit Trail**:
+   Aksi kritis seperti verifikasi pembayaran (`verified_by`, `verified_at`, `verification_notes`), penolakan bukti (`rejection_reason`), pembatalan booking, perubahan harga kamar, dan persetujuan pengeluaran dicatat dengan cap `user_id` dan `timestamp`.

@@ -116,14 +116,64 @@ Dokumen ini mendefinisikan kontrak endpoint REST API versi 1 (`/api/v1`), standa
 
 ---
 
-### E. Tagihan & Pembayaran (`/invoices` & `/payments`)
+### E. Tagihan & Pembayaran (`/invoices` & `/payments`) - Phase 2 Terimplementasi
 
 | Method | Endpoint | Deskripsi | Akses |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/invoices` | Daftar tagihan aktif & riwayat | Authenticated |
-| `GET` | `/invoices/{id}` | Detail rincian tagihan sewa, listrik, denda | Authenticated |
-| `POST` | `/invoices/{id}/pay` | Kirim pembayaran / upload bukti transfer | Tenant, Kasir |
-| `POST` | `/payments/{id}/verify`| Verifikasi bukti pembayaran (setujui / tolak) | Manager, Receptionist |
+| `GET` | `/invoices` | Daftar tagihan (Tenant: tagihan miliknya; Kasir/Owner: tagihan properti kelolaannya) | Authenticated |
+| `GET` | `/invoices/{id}` | Detail rincian tagihan sewa, breakdown, sisa saldo, dan riwayat pembayaran | Authenticated (Tenant pemilik / Staff properti) |
+| `POST` | `/invoices/{id}/payments` | Unggah bukti transfer manual (`multipart/form-data`) | Tenant pemilik invoice |
+| `GET` | `/payments` | Daftar pengajuan pembayaran (filter `status=pending` untuk verifikasi) | Kasir, Manager, Owner |
+| `GET` | `/payments/{id}` | Detail pengajuan pembayaran dan catatan audit | Kasir, Manager, Owner, Tenant pemilik |
+| `GET` | `/payments/{id}/proof` | Unduh/preview file bukti transfer terotentikasi (Storage privat aman) | Kasir, Manager, Owner, Tenant pemilik |
+| `POST` | `/payments/{id}/verify` | Menyetujui bukti transfer, mengurangi sisa saldo invoice secara atomik | Kasir, Manager, Owner (Dilarang verifikasi diri sendiri) |
+| `POST` | `/payments/{id}/reject` | Menolak bukti transfer dengan alasan penolakan wajib | Kasir, Manager, Owner |
+
+#### Contoh Payload Pengajuan Pembayaran: `POST /api/v1/invoices/{id}/payments`
+Header: `Content-Type: multipart/form-data`
+```http
+amount: 1500000
+payment_method: manual_transfer
+payment_provider: manual_bca
+sender_name: Rizky Pratama
+sender_bank: BCA
+proof_file: [FILE BINER JPG/PNG/PDF, Max 5MB]
+```
+
+#### Contoh Response Pengajuan: `201 Created`
+```json
+{
+  "success": true,
+  "message": "Bukti transfer berhasil diajukan dan sedang menunggu verifikasi kasir.",
+  "data": {
+    "id": 14,
+    "payment_code": "PAY-20261013-0001",
+    "invoice_id": 2,
+    "amount": "1500000.00",
+    "payment_method": "manual_transfer",
+    "payment_provider": "manual_bca",
+    "sender_name": "Rizky Pratama",
+    "sender_bank": "BCA",
+    "proof_url": "/api/v1/payments/14/proof",
+    "status": "pending",
+    "created_at": "2026-10-13T22:00:00.000000Z"
+  }
+}
+```
+
+#### Contoh Payload Verifikasi: `POST /api/v1/payments/{id}/verify`
+```json
+{
+  "notes": "Mutasi rekening koran BCA 13/10/2026 klir sesuai nominal."
+}
+```
+
+#### Contoh Payload Penolakan: `POST /api/v1/payments/{id}/reject`
+```json
+{
+  "rejection_reason": "Nominal transfer pada slip mutasi kurang dari Rp 1.500.000"
+}
+```
 
 ---
 

@@ -14,11 +14,19 @@ class Formatters {
 
   static String toIndonesianDate(DateTime? date) {
     if (date == null) return '-';
-    return DateFormat('d MMMM yyyy', 'id_ID').format(date);
+    try {
+      return DateFormat('d MMMM yyyy', 'id_ID').format(date);
+    } catch (_) {
+      return '${date.day}-${date.month}-${date.year}';
+    }
   }
 
   static String toShortDate(DateTime? date) {
     if (date == null) return '-';
-    return DateFormat('d MMM yyyy', 'id_ID').format(date);
+    try {
+      return DateFormat('d MMM yyyy', 'id_ID').format(date);
+    } catch (_) {
+      return '${date.day}-${date.month}-${date.year}';
+    }
   }
 }

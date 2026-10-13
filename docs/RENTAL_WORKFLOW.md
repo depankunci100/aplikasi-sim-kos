@@ -112,3 +112,45 @@ sequenceDiagram
    Staf mengubah status menjadi `in_progress`, melakukan perbaikan fisik di kamar, dan mengunggah foto bukti perbaikan.
 4. **Verifikasi & Penyelesaian**:
    Tiket ditandai `resolved`. Penyewa menerima notifikasi dan dapat memberikan konfirmasi serta ulasan kepuasan layanan.
+
+---
+
+## 5. Detail Alur Pembayaran Manual & Transisi Status Booking (Phase 2 Terimplementasi)
+
+```mermaid
+stateDiagram-v2
+    [*] --> BookingPending: Penyewa buat booking
+    BookingPending --> InvoiceIssued: Sistem terbitkan invoice sewa
+    InvoiceIssued --> PaymentUploaded: Penyewa transfer & upload bukti
+    
+    state PaymentVerification {
+        PaymentUploaded --> Verified: Kasir setujui (Cek mutasi rekening)
+        PaymentUploaded --> Rejected: Kasir tolak (Alasan wajib diisi)
+    }
+
+    Rejected --> PaymentUploaded: Penyewa revisi & upload ulang bukti
+    Verified --> InvoiceUpdated: Sisa saldo dikurangi secara atomik
+    
+    state InvoiceStatusCheck {
+        InvoiceUpdated --> PartiallyPaid: Pembayaran < Total Tagihan
+        InvoiceUpdated --> FullyPaid: Pembayaran >= Total Tagihan
+    }
+
+    PartiallyPaid --> BookingConfirmed: Minimal DP terpenuhi
+    FullyPaid --> BookingConfirmed: Booking sah dikonfirmasi
+    BookingConfirmed --> CheckIn: Tamu tiba di properti
+    CheckIn --> BookingActive: Serah terima kunci & kamar OCCUPIED
+```
+
+### Kebijakan Bisnis Pembayaran & Keuangan:
+1. **Formula Saldo Tersisa**:
+   $$\text{Sisa Saldo} = \text{Total Tagihan} - \sum(\text{Pembayaran Berstatus VERIFIED})$$
+2. **Pencegahan Overpayment (Kelebihan Bayar)**:
+   - Server menolak pengajuan nominal yang melebihi sisa saldo invoice (`amount > remaining_balance`).
+   - Apabila penyewa tidak sengaja mentransfer lebih banyak di bank, kasir mencatat catatan rekonsiliasi dan sisa dana dialokasikan ke deposit atau dikembalikan manual via kas operasional.
+3. **Pencegahan Double Processing (Race Condition)**:
+   - Proses verifikasi menggunakan transaksi database atomik dengan `DB::raw` / pessimistic row locking `lockForUpdate()`.
+   - Percobaan verifikasi kedua pada pembayaran yang sama akan ditolak dengan eksepsi `Payment status is not pending`.
+4. **Larangan Verifikasi Sendiri**:
+   - Penyewa tidak memiliki akses otorisasi untuk memverifikasi pembayarannya sendiri, bahkan jika memanipulasi request API. Petugas verifikasi wajib berwenang pada cabang properti tersebut.
+

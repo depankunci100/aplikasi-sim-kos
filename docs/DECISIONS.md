@@ -52,3 +52,35 @@ Dokumen ini mencatat keputusan-keputusan teknis fundamental, pertimbangan altern
 - **Status**: Disetujui (Accepted)
 - **Konteks**: Kesalahan pembulatan pecahan rupiah pada penghitungan sewa, denda harian, dan pemakaian kwh listrik dapat menyebabkan diskrepansi buku besar keuangan.
 - **Keputusan**: Seluruh kolom nominal uang, tarif kwh, dan denda menggunakan `DECIMAL(14, 2)` di database MySQL/MariaDB dan dibungkus dengan parser numerik presisi pada backend.
+
+---
+
+## ADR-006: Abstraksi Penyedia Pembayaran (Payment Provider Interface)
+- **Status**: Disetujui (Accepted)
+- **Konteks**: Fase awal menerapkan transfer manual rekening bank dan e-wallet dengan upload bukti transfer. Namun arsitektur harus siap mengadopsi Payment Gateway otomatis (seperti Midtrans atau Xendit) di fase berikutnya tanpa merombak logika invoice dan booking.
+- **Keputusan**: Menggunakan interface pattern `PaymentProviderInterface` dengan implementasi awal `ManualTransferProvider`.
+- **Konsekuensi**:
+  - Kolom `payment_provider` disimpan pada setiap entri pembayaran (`manual_bca`, `manual_mandiri`, `manual_bri`, `manual_gopay`).
+  - Penambahan gateway di masa depan cukup membuat class baru yang mengimplementasikan antarmuka tersebut dan mendaftarkan route callback webhook.
+  - Bukti transfer disimpan pada disk lokal terisolasi non-publik dan dialirkan via controller terotentikasi.
+
+---
+
+## ADR-007: Web Dashboard Terpadu Menggunakan Laravel 13 dan Bootstrap 5
+- **Status**: Disetujui (Accepted)
+- **Konteks**: Staf operasional (Kasir, Manager, Owner) membutuhkan antarmuka web yang cepat, responsif, stabil, dan mudah dipelihara untuk verifikasi pembayaran, pencarian invoice, dan monitoring kamar.
+- **Keputusan**: Menggunakan Blade Templating dan Bootstrap 5 terintegrasi langsung dalam Laravel 13 dengan autentikasi berbasis sesi terpisah dari token Sanctum mobile.
+- **Konsekuensi**:
+  - Tidak memerlukan build step SPA yang rumit untuk portal administrasi internal.
+  - Setiap controller dan route dilindungi otorisasi server-side dan CSRF protection.
+  - Endpoint REST API mobile tetap terpisah dan bersih di `/api/v1`.
+
+---
+
+## ADR-008: Kontrol Konkurensi & Anti-Double-Verification pada Mutasi Finansial
+- **Status**: Disetujui (Accepted)
+- **Konteks**: Klik ganda dari pengguna atau request konkuren dapat menimbulkan risiko verifikasi ganda yang menambah saldo lebih dari satu kali atau menyebabkan status inkonsisten.
+- **Keputusan**: Menggunakan transaksi database atomik `DB::transaction()` yang dipadukan dengan pessimistic row locking `lockForUpdate()` pada entri pembayaran dan invoice.
+- **Konsekuensi**:
+  - Permintaan verifikasi konkuren kedua akan tertahan hingga transaksi pertama selesai, lalu digagalkan karena status pembayaran sudah bukan `pending`.
+  - Pelunasan invoice memicu transisi status booking secara konsisten dan aman dari race condition.

@@ -31,6 +31,11 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.receipt_long_rounded),
+            tooltip: 'Tagihan & Pembayaran',
+            onPressed: () => context.push('/invoices'),
+          ),
+          IconButton(
             icon: const Icon(Icons.person_outline_rounded),
             onPressed: () => context.push('/profile'),
           ),
@@ -94,6 +99,44 @@ class HomeScreen extends ConsumerWidget {
                       style: TextStyle(color: Colors.white70, fontSize: 13),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Quick Action Card for Invoices
+              InkWell(
+                onTap: () => context.push('/invoices'),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withAlpha(60)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 28),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tagihan Sewa & Bukti Pembayaran',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Cek tagihan aktif, konfirmasi sisa saldo, dan kirim bukti transfer',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

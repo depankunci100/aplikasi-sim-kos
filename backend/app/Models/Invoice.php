@@ -14,6 +14,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'invoice_number',
+        'property_id',
         'booking_id',
         'user_id',
         'invoice_type',
@@ -42,6 +43,11 @@ class Invoice extends Model
         'paid_amount' => 'decimal:2',
     ];
 
+    public function property(): BelongsTo
+    {
+        return $this->belongsTo(Property::class);
+    }
+
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
@@ -60,5 +66,35 @@ class Invoice extends Model
     public function isPaid(): bool
     {
         return $this->status === InvoiceStatus::PAID;
+    }
+
+    public function getRemainingBalanceAttribute(): float
+    {
+        return max(0.00, round((float) $this->total_amount - (float) $this->paid_amount, 2));
+    }
+
+    /**
+     * Sinkronisasi ulang total pembayaran terverifikasi dan status invoice
+     */
+    public function syncPaidAmountAndStatus(): void
+    {
+        $verifiedSum = (float) $this->payments()
+            ->where('status', 'verified')
+            ->sum('amount');
+
+        $this->paid_amount = round($verifiedSum, 2);
+
+        if ($this->paid_amount >= (float) $this->total_amount) {
+            $this->status = InvoiceStatus::PAID;
+            $this->paid_at = $this->paid_at ?? now();
+        } elseif ($this->paid_amount > 0) {
+            $this->status = InvoiceStatus::PARTIALLY_PAID;
+            $this->paid_at = null;
+        } else {
+            $this->status = InvoiceStatus::UNPAID;
+            $this->paid_at = null;
+        }
+
+        $this->save();
     }
 }

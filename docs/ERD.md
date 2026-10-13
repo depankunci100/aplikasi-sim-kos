@@ -148,6 +148,7 @@ erDiagram
         enum invoice_type "rent, deposit, electricity, water, penalty, service"
         date period_start
         date period_end
+        bigint property_id FK
         decimal subtotal
         decimal discount
         decimal penalty
@@ -165,11 +166,15 @@ erDiagram
         bigint invoice_id FK
         bigint user_id FK
         enum payment_method "cash, manual_transfer, qris, payment_gateway"
+        string payment_provider "manual_bca, manual_mandiri, manual_bri, manual_gopay, midtrans, xendit"
+        string sender_name
+        string sender_bank
         decimal amount
         string proof_photo
         enum status "pending, verified, rejected"
         bigint verified_by FK
         timestamp verified_at
+        text verification_notes
         text rejection_reason
         timestamps created_at_updated_at
     }

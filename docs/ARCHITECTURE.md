@@ -101,6 +101,21 @@ graph TD
    - Rate limiting ketat pada endpoint autentikasi (`/api/v1/auth/login`, `/api/v1/auth/forgot-password`).
    - Penyimpanan password menggunakan hashing Argon2id / Bcrypt default Laravel.
    - Privasi data KTP penyewa disimpan dalam direktori storage privat yang hanya dapat diakses staf berwenang melalui signed URL.
+   - Bukti transfer (`payment_proofs/`) disimpan pada disk lokal privat dan hanya dialirkan via endpoint aman terotentikasi (`/api/v1/payments/{id}/proof`) dengan otorisasi tenant pemilik atau staf properti.
+
+5. **Abstraksi Pembayaran & Kesiapan Payment Gateway (Phase 2)**:
+   - Arsitektur memisahkan secara tegas konsep:
+     - `Invoice`: Kewajiban tagihan sewa / utilitas.
+     - `Payment`: Upaya / record transaksi pembayaran (bisa bertahap / parsial).
+     - `PaymentProviderInterface`: Kontrak penyedia pembayaran (`getProviderKey()`, `processPayment()`, `verifyPayment()`, `handleWebhook()`).
+     - `ManualTransferProvider`: Implementasi tahap pertama untuk transfer bank dan e-wallet manual dengan upload slip mutasi.
+     - `PaymentService`: Orkestrasi verifikasi finansial menggunakan `lockForUpdate()` database pessimistic locking, pencegahan overpayment, dan penolakan otomatis verifikasi diri sendiri (`self-verification forbidden`).
+   - Kesiapan Gateway Masa Depan: Provider baru (Midtrans, Xendit) dapat didaftarkan ke container tanpa merombak logika booking dan invoice.
+
+6. **Web Dashboard Operasional (Laravel 13 + Bootstrap 5)**:
+   - Antarmuka berbasis web responsif untuk Owner, Manajer, Kasir, dan Resepsionis.
+   - Menggunakan autentikasi berbasis sesi terpisah dari token Sanctum mobile.
+   - Dilindungi proteksi CSRF, escaping Blade, pagination server-side, dan permission check ketat pada setiap controller.
 
 ---
 

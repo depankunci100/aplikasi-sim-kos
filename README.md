@@ -84,16 +84,28 @@ aplikasi-sim-kos/
 ./infra/scripts/setup.sh
 ```
 
-### 2. Menjalankan Backend Secara Manual
+### 2. Menjalankan Backend & Web Dashboard Secara Manual
 ```bash
 cd backend
 composer install
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
+php artisan db:seed
 php artisan serve
 ```
-Backend API berjalan di `http://127.0.0.1:8000/api/v1`.
+- **REST API Endpoint**: `http://127.0.0.1:8000/api/v1`
+- **Web Dashboard (Bootstrap 5)**: `http://127.0.0.1:8000/dashboard` (Login di `http://127.0.0.1:8000/login`)
+
+#### Akun Demo Default (Seeder):
+| Peran | Email | Password | Akses Utama |
+| :--- | :--- | :--- | :--- |
+| **Super Admin** | `superadmin@simkos.id` | `password` | Semua properti & konfigurasi global |
+| **Owner** | `owner@simkos.id` | `password` | Dashboard pendapatan, kamar, verifikasi |
+| **Manager** | `manager@simkos.id` | `password` | Operasional cabang Graha Simkos Malang |
+| **Kasir / Resepsionis**| `receptionist@simkos.id`| `password` | Verifikasi bukti bayar & daftar invoice |
+| **Staff** | `staff@simkos.id` | `password` | Status kesiapan kamar & inspeksi |
+| **Penyewa (Tenant)** | `tenant@simkos.id` | `password` | Mobile App & Pengajuan bukti transfer |
 
 ### 3. Menjalankan Mobile Secara Manual
 ```bash
@@ -102,7 +114,19 @@ flutter pub get
 flutter run
 ```
 
-### 4. Menjalankan Menggunakan Docker Compose
+### 4. Menjalankan Pengujian Otomatis (Test Suites)
+- **Backend Test Suite (25 Tests Passing)**:
+  ```bash
+  cd backend && php artisan test
+  ```
+- **Flutter Test Suite & Static Analysis (100% Pass)**:
+  ```bash
+  cd mobile
+  flutter analyze
+  flutter test
+  ```
+
+### 5. Menjalankan Menggunakan Docker Compose
 ```bash
 cd infra/docker
 docker compose up -d --build

@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
+use App\Http\Controllers\Api\V1\InvoiceController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PropertyController;
 use App\Http\Controllers\Api\V1\RoomController;
 use Illuminate\Support\Facades\Route;
@@ -30,5 +32,20 @@ Route::prefix('v1')->group(function () {
         Route::get('/bookings', [BookingController::class, 'index']);
         Route::post('/bookings', [BookingController::class, 'store']);
         Route::get('/bookings/{id}', [BookingController::class, 'show']);
+
+        // Invoices & Payments (Tenant & Staff)
+        Route::get('/invoices', [InvoiceController::class, 'index']);
+        Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
+        Route::post('/invoices/{id}/payments', [InvoiceController::class, 'submitPayment']);
+
+        Route::get('/payments', [PaymentController::class, 'index']);
+        Route::get('/payments/{id}', [PaymentController::class, 'show']);
+        Route::get('/payments/{id}/proof', [PaymentController::class, 'getProof']);
+
+        // Verifikasi & Penolakan Pembayaran (Staf/Owner/Manager/Receptionist/Super Admin)
+        Route::middleware('role:super_admin,owner,manager,receptionist')->group(function () {
+            Route::post('/payments/{id}/verify', [PaymentController::class, 'verify']);
+            Route::post('/payments/{id}/reject', [PaymentController::class, 'reject']);
+        });
     });
 });
