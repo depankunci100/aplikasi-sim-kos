@@ -624,4 +624,298 @@ class UtilityMeterTest extends TestCase
             ->assertStatus(200)
             ->assertSee('Review Konsumsi Meter');
     }
+
+    public function test_cashier_role_boundary_can_generate_invoice_but_cannot_alter_or_create_meters(): void
+    {
+        $cashier = User::factory()->create(['role' => Role::RECEPTIONIST, 'name' => 'Kasir Kantor']);
+        DB::table('property_users')->insert([
+            'property_id' => $this->propertyA->id,
+            'user_id' => $cashier->id,
+            'role' => 'receptionist',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 1. Kasir DILARANG membuat master meter
+        Sanctum::actingAs($cashier);
+        $resCreateMeter = $this->postJson('/api/v1/utilities/meters', [
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => 'electricity',
+            'meter_number' => 'EL-CASHIER-DENIED',
+        ]);
+        $resCreateMeter->assertStatus(422)
+            ->assertJsonPath('message', 'Hanya Pemilik, Manajer, atau Staf berwenang yang dapat membuat meter utilitas.');
+
+        // 2. Kasir DILARANG mencatat pembacaan meter fisik
+        $meter = UtilityMeter::create([
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => 'electricity',
+            'meter_number' => 'EL-CASHIER-TEST',
+            'unit' => 'kWh',
+            'initial_reading' => 100,
+            'current_reading' => 100,
+            'is_active' => true,
+        ]);
+
+        $resRecordReading = $this->postJson('/api/v1/utilities/readings', [
+            'meter_id' => $meter->id,
+            'current_meter' => 120,
+            'reading_date' => now()->toDateString(),
+        ]);
+        $resRecordReading->assertStatus(422)
+            ->assertJsonPath('message', 'Penyewa dan Kasir tidak diizinkan mencatat pembacaan meter fisik.');
+
+        // 3. Kasir DIIZINKAN menerbitkan invoice dari pembacaan yang sudah disetujui
+        $reading = UtilityReading::create([
+            'meter_id' => $meter->id,
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => UtilityType::ELECTRICITY,
+            'previous_meter' => 100,
+            'current_meter' => 150,
+            'usage' => 50,
+            'rate_per_unit' => 1500,
+            'total_cost' => 75000,
+            'reading_date' => now()->toDateString(),
+            'status' => UtilityReadingStatus::APPROVED,
+            'is_billed' => false,
+        ]);
+
+        $resGenerate = $this->postJson("/api/v1/utilities/readings/{$reading->id}/generate-invoice");
+        $resGenerate->assertStatus(201);
+        $this->assertTrue((bool) $reading->fresh()->is_billed);
+    }
+
+    public function test_id_consistency_validation_rejects_mismatched_room_and_booking(): void
+    {
+        Sanctum::actingAs($this->staff);
+
+        $meterA = UtilityMeter::create([
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => 'electricity',
+            'meter_number' => 'EL-CONSISTENCY-A',
+            'unit' => 'kWh',
+            'initial_reading' => 0,
+            'current_reading' => 0,
+            'is_active' => true,
+        ]);
+
+        // Mismatched room_id (kamar 201 berada pada property B)
+        $resMismatchRoom = $this->postJson('/api/v1/utilities/readings', [
+            'meter_id' => $meterA->id,
+            'room_id' => $this->room201->id,
+            'current_meter' => 50,
+            'reading_date' => now()->toDateString(),
+        ]);
+        $resMismatchRoom->assertStatus(422)
+            ->assertJsonPath('message', "Kamar yang dipilih (ID: {$this->room201->id}) tidak sesuai dengan kamar yang terhubung ke meter ini (ID: {$this->room101->id}).");
+
+        // Mismatched booking_id (booking di property B)
+        $bookingB = Booking::create([
+            'booking_code' => 'BOOK-PROP-B',
+            'user_id' => $this->otherTenant->id,
+            'property_id' => $this->propertyB->id,
+            'room_id' => $this->room201->id,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addMonth()->toDateString(),
+            'total_amount' => 1500000,
+            'status' => 'confirmed',
+        ]);
+
+        $resMismatchBooking = $this->postJson('/api/v1/utilities/readings', [
+            'meter_id' => $meterA->id,
+            'booking_id' => $bookingB->id,
+            'current_meter' => 50,
+            'reading_date' => now()->toDateString(),
+        ]);
+        $resMismatchBooking->assertStatus(422);
+    }
+
+    public function test_chronological_reading_order_and_period_overlap_are_strictly_rejected(): void
+    {
+        Sanctum::actingAs($this->staff);
+
+        $meter = UtilityMeter::create([
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => 'electricity',
+            'meter_number' => 'EL-CHRONO-TEST',
+            'unit' => 'kWh',
+            'initial_reading' => 100,
+            'current_reading' => 100,
+            'is_active' => true,
+        ]);
+
+        // Catat dan setujui pembacaan periode 2026-10-01 s/d 2026-10-15
+        UtilityReading::create([
+            'meter_id' => $meter->id,
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => UtilityType::ELECTRICITY,
+            'previous_meter' => 100,
+            'current_meter' => 150,
+            'usage' => 50,
+            'rate_per_unit' => 1500,
+            'total_cost' => 75000,
+            'reading_date' => '2026-10-15',
+            'period_start' => '2026-10-01',
+            'period_end' => '2026-10-15',
+            'status' => UtilityReadingStatus::APPROVED,
+        ]);
+
+        // Mencoba mencatat pembacaan dengan tanggal mundur (2026-10-10) harus ditolak
+        $resBackwardDate = $this->postJson('/api/v1/utilities/readings', [
+            'meter_id' => $meter->id,
+            'current_meter' => 160,
+            'reading_date' => '2026-10-10',
+        ]);
+        $resBackwardDate->assertStatus(422)
+            ->assertJsonPath('message', 'Sudah ada pembacaan yang disetujui setelah tanggal 2026-10-10. Tanggal pembacaan harus berurutan secara kronologis.');
+
+        // Mencoba mencatat pembacaan dengan periode yang tumpang tindih harus ditolak
+        $resOverlap = $this->postJson('/api/v1/utilities/readings', [
+            'meter_id' => $meter->id,
+            'current_meter' => 180,
+            'reading_date' => '2026-10-25',
+            'period_start' => '2026-10-10', // Tumpang tindih dengan 2026-10-01 .. 2026-10-15
+            'period_end' => '2026-10-25',
+        ]);
+        $resOverlap->assertStatus(422)
+            ->assertJsonPath('message', 'Terdapat periode pembacaan yang tumpang tindih dengan pembacaan yang sudah disetujui untuk meter ini.');
+    }
+
+    public function test_correction_on_already_billed_reading_is_rejected(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $meter = UtilityMeter::create([
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => 'electricity',
+            'meter_number' => 'EL-CORRECT-BILLED',
+            'unit' => 'kWh',
+            'initial_reading' => 100,
+            'current_reading' => 200,
+            'is_active' => true,
+        ]);
+
+        $booking = Booking::first();
+        $invoice = \App\Models\Invoice::create([
+            'invoice_number' => 'INV-TEST-BILLED',
+            'property_id' => $this->propertyA->id,
+            'booking_id' => $booking->id,
+            'user_id' => $this->tenant->id,
+            'total_amount' => 150000,
+            'subtotal' => 150000,
+            'status' => \App\Enums\InvoiceStatus::UNPAID,
+            'due_date' => now()->addDays(7)->toDateString(),
+        ]);
+
+        $reading = UtilityReading::create([
+            'meter_id' => $meter->id,
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => UtilityType::ELECTRICITY,
+            'previous_meter' => 100,
+            'current_meter' => 200,
+            'usage' => 100,
+            'rate_per_unit' => 1500,
+            'total_cost' => 150000,
+            'reading_date' => now()->toDateString(),
+            'status' => UtilityReadingStatus::APPROVED,
+            'is_billed' => true,
+            'invoice_id' => $invoice->id,
+        ]);
+
+        $resCorrect = $this->postJson("/api/v1/utilities/readings/{$reading->id}/correct", [
+            'current_meter' => 210,
+            'reason' => 'Koreksi salah input angka',
+        ]);
+        $resCorrect->assertStatus(422)
+            ->assertJsonPath('message', 'Pembacaan yang telah ditagihkan ke invoice tidak boleh dikoreksi langsung. Hubungi kasir untuk penyesuaian invoice.');
+    }
+
+    public function test_unauthenticated_and_unauthorized_proof_photo_access_are_blocked(): void
+    {
+        $file = UploadedFile::fake()->image('proof.jpg', 640, 480);
+        $path = $file->store('utility_proofs/test', 'local');
+
+        $reading = UtilityReading::create([
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => UtilityType::ELECTRICITY,
+            'previous_meter' => 100,
+            'current_meter' => 150,
+            'usage' => 50,
+            'rate_per_unit' => 1500,
+            'total_cost' => 75000,
+            'reading_date' => now()->toDateString(),
+            'status' => UtilityReadingStatus::APPROVED,
+            'proof_photo' => $path,
+        ]);
+
+        // 1. Tanpa autentikasi (unauthenticated) -> 401
+        $resGuest = $this->getJson("/api/v1/utilities/readings/{$reading->id}/proof-photo");
+        $resGuest->assertStatus(401);
+
+        // 2. Tenant lain yang tidak menyewa kamar ini -> 403
+        Sanctum::actingAs($this->otherTenant);
+        $resOtherTenant = $this->getJson("/api/v1/utilities/readings/{$reading->id}/proof-photo");
+        $resOtherTenant->assertStatus(403);
+
+        // 3. Tenant sah yang menyewa kamar 101 -> 200 File Response
+        Sanctum::actingAs($this->tenant);
+        $resTenant = $this->getJson("/api/v1/utilities/readings/{$reading->id}/proof-photo");
+        $resTenant->assertStatus(200);
+    }
+
+    public function test_concurrent_lock_for_update_prevents_simultaneous_double_billing(): void
+    {
+        $utilityService = app(\App\Services\Utility\UtilityService::class);
+
+        $meter = UtilityMeter::create([
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'utility_type' => UtilityType::ELECTRICITY,
+            'meter_number' => 'EL-CONCURRENT-01',
+            'unit' => 'kWh',
+            'initial_reading' => 0,
+            'current_reading' => 100,
+            'is_active' => true,
+        ]);
+
+        $reading = UtilityReading::create([
+            'meter_id' => $meter->id,
+            'property_id' => $this->propertyA->id,
+            'room_id' => $this->room101->id,
+            'booking_id' => Booking::first()->id,
+            'utility_type' => UtilityType::ELECTRICITY,
+            'previous_meter' => 0,
+            'current_meter' => 100,
+            'usage' => 100,
+            'rate_per_unit' => 1500,
+            'total_cost' => 150000,
+            'reading_date' => now()->toDateString(),
+            'status' => UtilityReadingStatus::APPROVED,
+            'is_billed' => false,
+        ]);
+
+        // Request 1 berhasil
+        $invoice1 = $utilityService->generateUtilityInvoice($reading->id, $this->owner);
+        $this->assertNotNull($invoice1->id);
+
+        // Verifikasi count sebelum call kedua
+        $this->assertEquals(1, \App\Models\Invoice::where('property_id', $this->propertyA->id)->where('invoice_type', 'electricity')->count());
+        $this->assertEquals(1, \App\Models\InvoiceItem::where('item_type', 'electricity')->count());
+
+        // Request 2 (mensimulasikan race condition bersamaan) wajib melempar DomainException
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Tagihan untuk pembacaan meter ini sudah pernah diterbitkan sebelumnya');
+
+        $utilityService->generateUtilityInvoice($reading->id, $this->owner);
+    }
 }
+

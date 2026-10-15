@@ -51,7 +51,12 @@ class User extends Authenticatable
 
     public function isStaff(): bool
     {
-        return in_array($this->role, [Role::RECEPTIONIST, Role::STAFF]);
+        return $this->role === Role::STAFF;
+    }
+
+    public function isCashier(): bool
+    {
+        return $this->role === Role::RECEPTIONIST;
     }
 
     public function isTenant(): bool

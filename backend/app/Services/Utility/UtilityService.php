@@ -125,8 +125,8 @@ class UtilityService
      */
     public function createMeter(array $data, User $actor): UtilityMeter
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak memiliki izin membuat meter utilitas.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Hanya Pemilik, Manajer, atau Staf berwenang yang dapat membuat meter utilitas.');
         }
 
         $this->authorizePropertyAccess($actor, (int) $data['property_id']);
@@ -174,8 +174,8 @@ class UtilityService
      */
     public function updateMeter(UtilityMeter $meter, array $data, User $actor): UtilityMeter
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak memiliki izin mengubah konfigurasi meter.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Hanya Pemilik, Manajer, atau Staf berwenang yang dapat mengubah konfigurasi meter.');
         }
 
         $this->authorizePropertyAccess($actor, $meter->property_id);
@@ -360,8 +360,8 @@ class UtilityService
      */
     public function recordReading(array $data, ?UploadedFile $photo, User $actor): UtilityReading
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak diizinkan mencatat pembacaan meter resmi.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Penyewa dan Kasir tidak diizinkan mencatat pembacaan meter fisik.');
         }
 
         $meter = UtilityMeter::findOrFail($data['meter_id']);
@@ -369,6 +369,47 @@ class UtilityService
 
         $readingDate = $data['reading_date'] ?? now()->toDateString();
         $currentMeter = round((float) $data['current_meter'], 2);
+
+        // Validasi urutan kronologis: tidak boleh mencatat sebelum pembacaan yang sudah disetujui
+        $newerApprovedReading = UtilityReading::where('meter_id', $meter->id)
+            ->where('status', UtilityReadingStatus::APPROVED)
+            ->where('reading_date', '>', $readingDate)
+            ->exists();
+
+        if ($newerApprovedReading) {
+            throw new DomainException("Sudah ada pembacaan yang disetujui setelah tanggal {$readingDate}. Tanggal pembacaan harus berurutan secara kronologis.");
+        }
+
+        // Validasi duplikasi tanggal pembacaan yang sudah disetujui
+        $sameDateApproved = UtilityReading::where('meter_id', $meter->id)
+            ->where('status', UtilityReadingStatus::APPROVED)
+            ->where('reading_date', $readingDate)
+            ->exists();
+
+        if ($sameDateApproved) {
+            throw new DomainException("Sudah ada pembacaan yang disetujui pada tanggal {$readingDate} untuk meter ini.");
+        }
+
+        // Validasi periode tumpang tindih jika periode disediakan
+        if (!empty($data['period_start']) && !empty($data['period_end'])) {
+            $overlapExists = UtilityReading::where('meter_id', $meter->id)
+                ->where('status', UtilityReadingStatus::APPROVED)
+                ->whereNotNull('period_start')
+                ->whereNotNull('period_end')
+                ->where(function ($q) use ($data) {
+                    $q->whereBetween('period_start', [$data['period_start'], $data['period_end']])
+                      ->orWhereBetween('period_end', [$data['period_start'], $data['period_end']])
+                      ->orWhere(function ($sub) use ($data) {
+                          $sub->where('period_start', '<=', $data['period_start'])
+                              ->where('period_end', '>=', $data['period_end']);
+                      });
+                })
+                ->exists();
+
+            if ($overlapExists) {
+                throw new DomainException('Terdapat periode pembacaan yang tumpang tindih dengan pembacaan yang sudah disetujui untuk meter ini.');
+            }
+        }
 
         // Ambil pembacaan terakhir yang disetujui sebelum atau pada tanggal ini
         $lastApprovedReading = UtilityReading::where('meter_id', $meter->id)
@@ -400,11 +441,29 @@ class UtilityService
             throw new DomainException('Nilai pemakaian utilitas tidak boleh bernilai negatif.');
         }
 
-        // 4. Hubungkan Kamar dan Booking Terkait
-        $roomId = $meter->room_id ?? ($data['room_id'] ?? null);
-        $bookingId = $data['booking_id'] ?? null;
+        // 4. Hubungkan Kamar dan Booking Terkait dengan Validasi Konsistensi
+        $roomId = $meter->room_id;
+        if (!empty($data['room_id'])) {
+            if ($meter->room_id && (int) $data['room_id'] !== (int) $meter->room_id) {
+                throw new DomainException("Kamar yang dipilih (ID: {$data['room_id']}) tidak sesuai dengan kamar yang terhubung ke meter ini (ID: {$meter->room_id}).");
+            }
 
-        if (!$bookingId && $roomId) {
+            if (!$meter->room_id) {
+                $room = Room::where('property_id', $meter->property_id)->findOrFail($data['room_id']);
+                $roomId = $room->id;
+            }
+        }
+
+        $bookingId = $data['booking_id'] ?? null;
+        if ($bookingId) {
+            $booking = Booking::where('property_id', $meter->property_id)->find($bookingId);
+            if (!$booking) {
+                throw new DomainException("Booking (ID: {$bookingId}) tidak ditemukan pada properti ini.");
+            }
+            if ($roomId && (int) $booking->room_id !== (int) $roomId) {
+                throw new DomainException("Booking (ID: {$bookingId}) tidak sesuai dengan kamar meter (ID: {$roomId}).");
+            }
+        } elseif ($roomId) {
             // Cari booking aktif pada tanggal pembacaan
             $activeBooking = Booking::where('room_id', $roomId)
                 ->whereIn('status', ['confirmed', 'checked_in'])
@@ -516,7 +575,7 @@ class UtilityService
 
         $this->authorizePropertyAccess($actor, $reading->property_id);
 
-        if ($reading->is_billed) {
+        if ($reading->is_billed || $reading->invoice_id !== null) {
             throw new DomainException('Pembacaan ini sudah ditagihkan ke invoice dan tidak dapat diubah statusnya.');
         }
 
@@ -567,13 +626,13 @@ class UtilityService
      */
     public function correctReading(UtilityReading $reading, float $newCurrentMeter, string $reason, User $actor): UtilityReading
     {
-        if ($actor->isTenant() || $actor->isStaff()) {
-            throw new DomainException('Hanya Pemilik, Manajer, atau Kasir yang berwenang melakukan koreksi pembacaan meter.');
+        if ($actor->isTenant() || $actor->isStaff() || $actor->isCashier()) {
+            throw new DomainException('Hanya Pemilik atau Manajer yang berwenang melakukan koreksi teknis pembacaan meter.');
         }
 
         $this->authorizePropertyAccess($actor, $reading->property_id);
 
-        if ($reading->is_billed) {
+        if ($reading->is_billed || $reading->invoice_id !== null) {
             throw new DomainException('Pembacaan yang telah ditagihkan ke invoice tidak boleh dikoreksi langsung. Hubungi kasir untuk penyesuaian invoice.');
         }
 
