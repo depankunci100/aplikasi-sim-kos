@@ -255,3 +255,38 @@ Berada pada `app/Services/Utility/UtilityService.php`, merangkum seluruh aturan 
 6. **Audit Trail Pencatatan & Koreksi (`utility_reading_logs`)**:
    - Merekam setiap state transition: `recorded`, `approved`, `rejected` (wajib menyertakan alasan penolakan), `corrected` (merekam nilai lama, nilai baru, alasan koreksi, dan aktor), serta `billed`.
 
+
+---
+
+## 8. Arsitektur Financial Management, Operational Expenses & Business Analytics (Phase 6)
+
+### A. Domain Service: `ExpenseService`
+Berada pada `app/Services/Finance/ExpenseService.php`, merangkum seluruh aturan bisnis pengeluaran operasional:
+1. **Siklus Hidup Terpisah**:
+   - `Approval Lifecycle`: `draft` -> `submitted` -> `approved` / `rejected`.
+   - `Payment Lifecycle`: `unpaid` -> `partially_paid` -> `paid`.
+2. **Pemisahan Tugas Persetujuan (Segregation of Duties)**:
+   - Pengaju (`user_id`) tidak diizinkan menyetujui pengajuannya sendiri sekalipun memiliki role `owner` atau `manager`.
+   - Menolak atau menyetujui pengeluaran harus dilakukan oleh atasan/pengelola lain.
+3. **Pencairan Bertahap & Anti-Overpayment**:
+   - Mendukung pembayaran bertahap (misalnya untuk renovasi atau pemeliharaan besar).
+   - Setiap pembayaran divalidasi tidak melebihi sisa kewajiban (`remaining_balance`) menggunakan row lock database (`lockForUpdate`).
+4. **Penyimpanan Kuitansi Privat**:
+   - Nota bukti pengeluaran disimpan di `storage/app/private/expenses/{id}/` dan disajikan lewat streaming terotentikasi.
+
+### B. Domain Service: `FinancialReportService`
+Berada pada `app/Services/Finance/FinancialReportService.php`, bertanggung jawab atas agregasi metrik finansial tanpa double counting:
+1. **Laporan Pendapatan**:
+   - Menampilkan total tagihan yang diterbitkan, penerimaan kas terverifikasi (`payments.status = verified`), dan sisa piutang.
+   - Mengelompokkan pendapatan sewa vs utilitas berdasarkan line items invoice.
+2. **Laporan Pengeluaran**:
+   - Memisahkan beban yang telah dibayar (kas keluar riil) dengan pengeluaran yang baru disetujui atau diajukan (komitmen belum dibayar).
+   - Breakdown per kategori pengeluaran dan per properti.
+3. **Laporan Arus Kas (Cash Flow)**:
+   - Menghitung penerimaan kas terverifikasi minus kas keluar untuk pengeluaran operasional yang telah dibayarkan pada periode tersebut.
+4. **Laporan Piutang & Aging**:
+   - Mengelompokkan invoice yang belum lunas ke dalam bucket umur: 0-30 hari, 31-60 hari, 61-90 hari, dan >90 hari.
+5. **Ringkasan Hasil Usaha (Operating Summary)**:
+   - Menghitung selisih penerimaan kas terverifikasi dan beban kas keluar operasional sebagai estimasi hasil usaha operasional (Cash-basis Operating Summary).
+6. **Owner Dashboard & Business Analytics**:
+   - Menyediakan KPI eksekutif, tingkat okupansi kamar, tren 6 bulan pendapatan vs pengeluaran, komposisi pengeluaran, dan perbandingan properti.

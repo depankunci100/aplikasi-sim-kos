@@ -128,5 +128,26 @@ Route::prefix('v1')->group(function () {
         Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
         Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+        // Phase 6: Operational Expense Management & Approval Workflow
+        Route::get('/expenses', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'index']);
+        Route::post('/expenses', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'store']);
+        Route::get('/expenses/categories', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'categories']);
+        Route::post('/expenses/categories', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'storeCategory']);
+        Route::get('/expenses/{id}', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'show']);
+        Route::put('/expenses/{id}', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'update']);
+        Route::post('/expenses/{id}/submit', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'submit']);
+        Route::post('/expenses/{id}/approve', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'approve']);
+        Route::post('/expenses/{id}/reject', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'reject']);
+        Route::post('/expenses/{id}/pay', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'recordPayment']);
+        Route::get('/expenses/{id}/receipt', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'receipt']);
+
+        // Phase 6: Business Analytics & Financial Reports
+        Route::get('/finance/dashboard', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'dashboard']);
+        Route::get('/finance/reports/income', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'income']);
+        Route::get('/finance/reports/expenses', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'expenses']);
+        Route::get('/finance/reports/cash-flow', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'cashFlow']);
+        Route::get('/finance/reports/receivables', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'receivables']);
+        Route::get('/finance/reports/operating-summary', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'operatingSummary']);
     });
 });

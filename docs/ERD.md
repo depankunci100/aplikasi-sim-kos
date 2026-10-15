@@ -529,3 +529,83 @@ erDiagram
 8. **Isolasi Keluhan Finansial dari Modifikasi Invoice**:
    Keluhan yang berkategori tagihan (`billing`) tidak pernah memodifikasi invoice atau pembayaran secara otomatis. Seluruh penyesuaian nominal harus melalui alur koreksi finansial yang sah.
 
+
+---
+
+## 4. Skema Database Phase 6 (Financial Management & Operational Expenses)
+
+### Tabel: `expense_categories`
+- **Fungsi**: Master kategori pengeluaran operasional kos/guesthouse.
+- **Kolom Utama**:
+  - `id` (BIGINT, PK, Auto Increment)
+  - `name` (VARCHAR 100, NOT NULL)
+  - `code` (VARCHAR 50, UNIQUE, NOT NULL) - e.g. `rent_income`, `electricity_water`, `internet`, `maintenance`, `housekeeping`, `salaries_labor`, `supplies`, `tax_admin`, `other`
+  - `type` (ENUM: `expense`, `income`, DEFAULT: `expense`)
+  - `description` (TEXT, NULLABLE)
+  - `is_active` (BOOLEAN, DEFAULT: true)
+  - `created_at`, `updated_at` (TIMESTAMP)
+
+### Tabel: `expenses` (Diperbarui pada Phase 6)
+- **Fungsi**: Transaksi pengeluaran operasional dengan siklus approval dan pembayaran terpisah.
+- **Kolom Utama**:
+  - `id` (BIGINT, PK, Auto Increment)
+  - `transaction_number` (VARCHAR 50, UNIQUE, NOT NULL) - Format: `EXP-YYYYMM-XXXX`
+  - `property_id` (BIGINT, FK -> `properties.id`, CASCADE)
+  - `expense_category_id` (BIGINT, FK -> `expense_categories.id`, RESTRICT)
+  - `user_id` (BIGINT, FK -> `users.id`, pengaju draf/pembuat)
+  - `expense_date` (DATE, NOT NULL)
+  - `title` (VARCHAR 255, NOT NULL)
+  - `description` (TEXT, NULLABLE)
+  - `vendor` (VARCHAR 255, NULLABLE)
+  - `amount` (DECIMAL 14, 2, NOT NULL)
+  - `paid_amount` (DECIMAL 14, 2, DEFAULT: 0.00)
+  - `payment_method` (VARCHAR 50, DEFAULT: `cash`)
+  - `receipt_path` (VARCHAR 255, NULLABLE, private disk storage)
+  - `approval_status` (ENUM: `draft`, `submitted`, `approved`, `rejected`, DEFAULT: `draft`)
+  - `payment_status` (ENUM: `unpaid`, `partially_paid`, `paid`, DEFAULT: `unpaid`)
+  - `submitted_at` (TIMESTAMP, NULLABLE)
+  - `approved_by` (BIGINT, FK -> `users.id`, SET NULL)
+  - `approved_at` (TIMESTAMP, NULLABLE)
+  - `rejection_reason` (TEXT, NULLABLE)
+  - `paid_at` (TIMESTAMP, NULLABLE)
+  - `created_at`, `updated_at`, `deleted_at` (TIMESTAMP)
+
+### Tabel: `expense_payments`
+- **Fungsi**: Pencatatan riwayat pembayaran/pencairan dana pengeluaran (mendukung termin/parsial dan lunas).
+- **Kolom Utama**:
+  - `id` (BIGINT, PK, Auto Increment)
+  - `expense_id` (BIGINT, FK -> `expenses.id`, CASCADE)
+  - `paid_by` (BIGINT, FK -> `users.id`, RESTRICT)
+  - `amount` (DECIMAL 14, 2, NOT NULL)
+  - `payment_date` (DATE, NOT NULL)
+  - `payment_method` (VARCHAR 50, NOT NULL)
+  - `receipt_path` (VARCHAR 255, NULLABLE)
+  - `notes` (TEXT, NULLABLE)
+  - `created_at`, `updated_at` (TIMESTAMP)
+
+### Tabel: `expense_logs`
+- **Fungsi**: Audit trail lengkap setiap mutasi status dan transaksi pada pengeluaran.
+- **Kolom Utama**:
+  - `id` (BIGINT, PK, Auto Increment)
+  - `expense_id` (BIGINT, FK -> `expenses.id`, CASCADE)
+  - `user_id` (BIGINT, FK -> `users.id`, SET NULL)
+  - `action` (VARCHAR 50, NOT NULL) - e.g. `created`, `updated`, `submitted`, `approved`, `rejected`, `payment_recorded`, `deleted`
+  - `notes` (TEXT, NULLABLE)
+  - `metadata` (JSON, NULLABLE)
+  - `created_at`, `updated_at` (TIMESTAMP)
+
+---
+
+## 5. Aturan Integritas Finansial Phase 6
+
+1. **Pemisahan Status Approval dan Pembayaran**:
+   - Status persetujuan (`approval_status`) berdiri terpisah dari status pembayaran (`payment_status`).
+   - Pembayaran hanya dapat dicatat jika status approval adalah `approved`. Pengeluaran berstatus `draft`, `submitted`, atau `rejected` tidak dapat dicairkan dananya.
+2. **Perlindungan Anti-Overpayment (Anti-Kelebihan Bayar)**:
+   - Pencairan dana sebagian (`partially_paid`) divalidasi ketat: total akumulasi `expense_payments.amount` tidak boleh melebihi `expenses.amount`.
+   - Proses pencatatan pembayaran dikunci menggunakan row-level lock (`lockForUpdate`) dalam transaksi database (`DB::transaction`).
+3. **Pemisahan Tugas Persetujuan (Segregation of Duties)**:
+   - Pengaju pengeluaran dilarang menyetujui pengajuannya sendiri, menjamin transparansi dan kepatuhan akuntansi.
+4. **Pengakuan Kas Bersih vs Nilai Tagihan**:
+   - Laporan Arus Kas dan Penerimaan Aktual hanya menghitung dana yang benar-benar masuk dan berstatus `verified` pada tabel `payments`.
+   - Nilai invoice yang belum lunas tidak dihitung sebagai arus kas masuk, melainkan disajikan pada Laporan Piutang (*Accounts Receivable Aging*).

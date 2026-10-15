@@ -126,6 +126,29 @@
                             <i class="bi bi-stars me-1"></i> Kebersihan
                         </a>
                     </li>
+                    @if(!auth()->user()->isTenant())
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('dashboard.expenses.*') ? 'active' : '' }}" href="{{ route('dashboard.expenses.index') }}">
+                            <i class="bi bi-wallet2 me-1"></i> Pengeluaran
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('dashboard.finance.*', 'dashboard.reports.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-graph-up-arrow me-1"></i> Keuangan & Laporan
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ route('dashboard.finance.index') }}"><i class="bi bi-pie-chart me-2"></i>Dashboard Keuangan</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.reports.income') }}"><i class="bi bi-cash-stack me-2"></i>Laporan Pendapatan</a></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.reports.expenses') }}"><i class="bi bi-cart-x me-2"></i>Laporan Pengeluaran</a></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.reports.cash-flow') }}"><i class="bi bi-arrow-left-right me-2"></i>Laporan Arus Kas</a></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.reports.receivables') }}"><i class="bi bi-clock-history me-2"></i>Laporan Piutang</a></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.reports.operating-summary') }}"><i class="bi bi-calculator me-2"></i>Ringkasan Hasil Usaha</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.expenses.categories') }}"><i class="bi bi-tags me-2"></i>Kategori Pengeluaran</a></li>
+                        </ul>
+                    </li>
+                    @endif
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <div class="text-end d-none d-sm-block">

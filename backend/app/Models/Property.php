@@ -89,6 +89,16 @@ class Property extends Model
         return $this->hasMany(HousekeepingTask::class);
     }
 
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
+    public function expenseCategories(): HasMany
+    {
+        return $this->hasMany(ExpenseCategory::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('properties.is_active', true);

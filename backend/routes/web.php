@@ -128,4 +128,35 @@ Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(functi
         Route::post('/{id}/cancel', [HousekeepingWebController::class, 'cancel'])->name('cancel');
         Route::get('/{id}/photo', [HousekeepingWebController::class, 'photo'])->name('photo');
     });
+
+    // Phase 6: Financial Management, Expenses & Approval Workflow
+    Route::prefix('expenses')->name('expenses.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Web\ExpenseWebController::class, 'index'])->name('index');
+        Route::get('/create', [\App\Http\Controllers\Web\ExpenseWebController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\Web\ExpenseWebController::class, 'store'])->name('store');
+        Route::get('/categories', [\App\Http\Controllers\Web\ExpenseWebController::class, 'categories'])->name('categories');
+        Route::post('/categories', [\App\Http\Controllers\Web\ExpenseWebController::class, 'storeCategory'])->name('categories.store');
+        Route::post('/categories/{id}/toggle', [\App\Http\Controllers\Web\ExpenseWebController::class, 'toggleCategory'])->name('categories.toggle');
+        Route::get('/{id}', [\App\Http\Controllers\Web\ExpenseWebController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [\App\Http\Controllers\Web\ExpenseWebController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [\App\Http\Controllers\Web\ExpenseWebController::class, 'update'])->name('update');
+        Route::post('/{id}/submit', [\App\Http\Controllers\Web\ExpenseWebController::class, 'submit'])->name('submit');
+        Route::post('/{id}/approve', [\App\Http\Controllers\Web\ExpenseWebController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject', [\App\Http\Controllers\Web\ExpenseWebController::class, 'reject'])->name('reject');
+        Route::post('/{id}/pay', [\App\Http\Controllers\Web\ExpenseWebController::class, 'recordPayment'])->name('pay');
+        Route::get('/{id}/receipt', [\App\Http\Controllers\Web\ExpenseWebController::class, 'receipt'])->name('receipt');
+        Route::get('/{id}/payments/{paymentId}/proof', [\App\Http\Controllers\Web\ExpenseWebController::class, 'paymentProof'])->name('payment-proof');
+    });
+
+    // Phase 6: Owner Dashboard, Business Analytics & Financial Reports
+    Route::get('/finance', [\App\Http\Controllers\Web\FinanceWebController::class, 'dashboard'])->name('finance.index');
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/income', [\App\Http\Controllers\Web\FinanceWebController::class, 'incomeReport'])->name('income');
+        Route::get('/expenses', [\App\Http\Controllers\Web\FinanceWebController::class, 'expenseReport'])->name('expenses');
+        Route::get('/cash-flow', [\App\Http\Controllers\Web\FinanceWebController::class, 'cashFlowReport'])->name('cash-flow');
+        Route::get('/receivables', [\App\Http\Controllers\Web\FinanceWebController::class, 'receivablesReport'])->name('receivables');
+        Route::get('/operating-summary', [\App\Http\Controllers\Web\FinanceWebController::class, 'operatingSummaryReport'])->name('operating-summary');
+        Route::get('/export/{type}', [\App\Http\Controllers\Web\FinanceWebController::class, 'export'])->name('export');
+    });
 });
+

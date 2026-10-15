@@ -95,3 +95,21 @@ Keterangan:
      - *Manager / Owner*: Menjadwalkan tugas kebersihan kamar/area umum, menugaskan staf, membatalkan tugas terjadwal, dan melakukan evaluasi/verifikasi penyelesaian tugas.
      - *Staff Kebersihan*: Melihat tugas yang ditugaskan, memulai pembersihan (`start`), mencentang checklist interaktif, mengunggah foto before/after, serta melaporkan temuan barang rusak atau hilang (`damaged_or_missing_items`).
      - *Non-Alteration of Room Lifecycle*: Housekeeping tidak memiliki wewenang untuk mengubah status booking, check-in/out tamu, atau mendeklarasikan ketersediaan kamar di luar workflow sewa resmi.
+
+10. **Otorisasi & Batasan Modul Phase 6 (Financial Management, Operational Expenses & Analytics)**:
+   - **Segregation of Duties (Pemisahan Tugas Persetujuan)**:
+     - Pengaju pengeluaran (`user_id` pembuat draft) secara tegas **DILARANG** menyetujui (`approve`) pengajuannya sendiri, bahkan jika pengaju memiliki role `owner` atau `manager`.
+     - Upaya self-approval akan diblokir oleh backend dengan exception/403: *"Anda tidak dapat menyetujui pengeluaran yang Anda ajukan sendiri (Segregation of Duties)"*.
+   - **Operational Expenses**:
+     - *Tenant*: Tidak memiliki akses apa pun ke modul pengeluaran (`403 Forbidden`).
+     - *Staff*: Hanya berhak membuat draf pengeluaran operasional cabang (`draft`), mengunggah nota/kuitansi, dan mengajukan persetujuan (`submitted`). Staf dilarang menyetujui atau mencatat pencairan dana.
+     - *Receptionist / Kasir*: Dapat membuat pengeluaran kas kecil dan mencatat pembayaran jika didelegasikan, namun dilarang menyetujui pengeluaran manajerial/investasi.
+     - *Manager*: Berwenang membuat, mengajukan, menyetujui/menolak pengeluaran staf pada cabang yang dikelolanya, dan mencatat pembayaran pengeluaran yang telah disetujui.
+     - *Owner*: Berwenang mengelola kategori, meninjau seluruh pengeluaran pada properti miliknya, menyetujui/menolak pengajuan, dan mencatat pencairan dana.
+     - *Super Admin*: Memiliki otoritas pengawasan global lintas cabang dan dapat meninjau log audit.
+   - **Keamanan Bukti Transaksi (Private Receipts)**:
+     - File kuitansi/nota disimpan di private disk storage (`storage/app/private/expenses/{id}/`). Akses file disaring ketat melalui endpoint terotentikasi berdasarkan hak akses properti.
+   - **Laporan Keuangan & Owner Analytics**:
+     - Hanya dapat diakses oleh `owner`, `manager` (terisolasi pada cabangnya), dan `super_admin`.
+     - `tenant` dan `staff` operasional diblokir dari akses laporan pendapatan, arus kas, piutang, dan metrik bisnis (`403 Forbidden`).
+     - Laporan piutang dan penerimaan bersumber dari invoice & payment terverifikasi tanpa rekayasa data.

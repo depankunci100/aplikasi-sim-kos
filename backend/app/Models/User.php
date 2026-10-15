@@ -69,6 +69,21 @@ class User extends Authenticatable
         return $this->belongsToMany(Property::class, 'property_users')->withPivot('role')->withTimestamps();
     }
 
+    public function expenses(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Expense::class, 'user_id');
+    }
+
+    public function approvedExpenses(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Expense::class, 'approved_by');
+    }
+
+    public function expensePayments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ExpensePayment::class, 'recorded_by');
+    }
+
     public function hasRole(string ...$roles): bool
     {
         $currentRole = $this->role instanceof Role ? $this->role->value : (string) $this->role;

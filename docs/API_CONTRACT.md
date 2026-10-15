@@ -432,3 +432,70 @@ status=pending_review
 | `POST` | `/api/v1/notifications/read-all` | Authenticated | Menandai seluruh notifikasi pengguna sebagai terbaca |
 
 
+---
+
+## 11. Modul Phase 6: Financial Management, Operational Expenses & Business Analytics
+
+### A. Modul Operational Expenses (`/api/v1/expenses`)
+
+| Method | Endpoint | Role | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/expenses` | Staff, Manager, Owner, Admin | Daftar pengeluaran operasional dengan filter properti, kategori, status approval, status pembayaran, tanggal |
+| `GET` | `/api/v1/expenses/categories` | Staff, Manager, Owner, Admin | Daftar kategori pengeluaran aktif |
+| `POST` | `/api/v1/expenses/categories` | Owner, Admin | Tambah kategori pengeluaran baru |
+| `POST` | `/api/v1/expenses` | Staff, Manager, Owner, Admin | Buat draft pengeluaran baru (mendukung upload file `receipt`) |
+| `GET` | `/api/v1/expenses/{id}` | Staff, Manager, Owner, Admin | Detail pengeluaran, daftar pembayaran parsial/lunas, dan log audit |
+| `PUT` | `/api/v1/expenses/{id}` | Staff, Manager, Owner, Admin | Update draft pengeluaran (hanya status `draft`) |
+| `DELETE` | `/api/v1/expenses/{id}` | Staff, Manager, Owner, Admin | Hapus draft pengeluaran (hanya status `draft`) |
+| `POST` | `/api/v1/expenses/{id}/submit` | Staff, Manager, Owner, Admin | Ajukan pengeluaran untuk approval (`draft` -> `submitted`) |
+| `POST` | `/api/v1/expenses/{id}/approve` | Manager, Owner, Admin | Setujui pengeluaran (dilindungi aturan Segregation of Duties) |
+| `POST` | `/api/v1/expenses/{id}/reject` | Manager, Owner, Admin | Tolak pengeluaran (wajib menyertakan `rejection_reason`) |
+| `POST` | `/api/v1/expenses/{id}/pay` | Manager, Owner, Admin, Cashier | Catat pencairan pembayaran pengeluaran (parsial atau lunas) |
+| `GET` | `/api/v1/expenses/{id}/receipt` | Authorised Role | Streaming aman file nota/kuitansi bukti pengeluaran |
+
+#### Contoh Request: `POST /api/v1/expenses/{id}/pay`
+```json
+{
+  "amount": 250000,
+  "payment_method": "bank_transfer",
+  "payment_date": "2026-10-15",
+  "notes": "Pembayaran tahap 1 teknisi AC"
+}
+```
+
+#### Contoh Response: `200 OK`
+```json
+{
+  "success": true,
+  "message": "Pembayaran pengeluaran sebesar Rp 250.000 berhasil dicatat.",
+  "data": {
+    "id": 1,
+    "transaction_number": "EXP-202610-0001",
+    "amount": "500000.00",
+    "paid_amount": "250000.00",
+    "remaining_balance": 250000,
+    "payment_status": "partially_paid",
+    "approval_status": "approved"
+  }
+}
+```
+
+### B. Modul Financial Reports & Business Analytics (`/api/v1/finance`)
+
+| Method | Endpoint | Role | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/finance/dashboard` | Manager, Owner, Admin | KPI keuangan terverifikasi, occupancy rate, pengeluaran pending, tren 6 bulan, komposisi pengeluaran |
+| `GET` | `/api/v1/finance/reports/income` | Manager, Owner, Admin | Laporan pendapatan: sewa, utilitas, penerimaan terverifikasi aktual, piutang, dan invoice diterbitkan |
+| `GET` | `/api/v1/finance/reports/expenses` | Manager, Owner, Admin | Laporan pengeluaran operasional per kategori, per properti, dan status realisasi |
+| `GET` | `/api/v1/finance/reports/cash-flow` | Manager, Owner, Admin | Laporan arus kas bersih berbasis kas riil yang masuk dan keluar |
+| `GET` | `/api/v1/finance/reports/receivables` | Manager, Owner, Admin | Laporan piutang invoice belum lunas dengan aging buckets (0-30, 31-60, 61-90, >90 hari) |
+| `GET` | `/api/v1/finance/reports/operating-summary` | Manager, Owner, Admin | Ringkasan estimasi hasil usaha (Penerimaan Terverifikasi - Beban Operasional Dibayar) |
+
+#### Parameter Filter Laporan Keuangan:
+- `property_id` (integer, opsional): Filter spesifik ID properti.
+- `start_date` (date: `YYYY-MM-DD`, opsional): Batas awal periode.
+- `end_date` (date: `YYYY-MM-DD`, opsional): Batas akhir periode.
+- `month` (integer 1-12, opsional): Bulan pelaporan.
+- `year` (integer, opsional): Tahun pelaporan.
+- `category_id` (integer, opsional): Filter kategori transaksi pengeluaran.
+- `status` (string, opsional): Filter status pembayaran atau approval.

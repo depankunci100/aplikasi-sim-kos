@@ -55,4 +55,13 @@ class ApiEndpoints {
   static const String maintenance = '/maintenance';
   static const String housekeeping = '/housekeeping';
   static const String notifications = '/notifications';
+
+  static const String expenses = '/expenses';
+  static const String expenseCategories = '/expenses/categories';
+  static const String financeDashboard = '/finance/dashboard';
+  static const String reportsIncome = '/finance/reports/income';
+  static const String reportsExpenses = '/finance/reports/expenses';
+  static const String reportsCashFlow = '/finance/reports/cash-flow';
+  static const String reportsReceivables = '/finance/reports/receivables';
+  static const String reportsOperatingSummary = '/finance/reports/operating-summary';
 }

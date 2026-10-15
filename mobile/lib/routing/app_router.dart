@@ -28,6 +28,12 @@ import '../features/complaints/screens/complaint_form_screen.dart';
 import '../features/housekeeping/models/housekeeping_model.dart';
 import '../features/housekeeping/screens/housekeeping_list_screen.dart';
 import '../features/housekeeping/screens/housekeeping_detail_screen.dart';
+import '../features/finance/models/expense_model.dart';
+import '../features/finance/screens/financial_dashboard_screen.dart';
+import '../features/finance/screens/expense_list_screen.dart';
+import '../features/finance/screens/expense_detail_screen.dart';
+import '../features/finance/screens/expense_form_screen.dart';
+import '../features/finance/screens/financial_reports_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -169,6 +175,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/finance/dashboard',
+        builder: (context, state) => const FinancialDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/finance/expenses',
+        builder: (context, state) => const ExpenseListScreen(),
+      ),
+      GoRoute(
+        path: '/finance/expenses/new',
+        builder: (context, state) => const ExpenseFormScreen(),
+      ),
+      GoRoute(
+        path: '/finance/expenses/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final item = state.extra as ExpenseModel?;
+          return ExpenseDetailScreen(expenseId: id, initialExpense: item);
+        },
+      ),
+      GoRoute(
+        path: '/finance/reports',
+        builder: (context, state) => const FinancialReportsScreen(),
       ),
     ],
     redirect: (context, state) {
