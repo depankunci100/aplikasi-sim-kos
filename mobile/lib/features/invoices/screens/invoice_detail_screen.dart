@@ -97,7 +97,19 @@ class InvoiceDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    _DetailRow(label: 'Sewa Pokok (${invoice.invoiceType.toUpperCase()})', value: Formatters.toRupiah(invoice.subtotal)),
+                    if (invoice.items.isNotEmpty) ...[
+                      for (final item in invoice.items) ...[
+                        _DetailRow(
+                          label: item.unit != null
+                              ? '${item.name} (${item.quantity} ${item.unit})'
+                              : item.name,
+                          value: Formatters.toRupiah(item.amount),
+                        ),
+                        const Divider(height: 16),
+                      ],
+                    ] else ...[
+                      _DetailRow(label: 'Sewa Pokok (${invoice.invoiceType.toUpperCase()})', value: Formatters.toRupiah(invoice.subtotal)),
+                    ],
                     if (invoice.discount > 0) ...[
                       const Divider(height: 16),
                       _DetailRow(label: 'Potongan Harga (Diskon)', value: '- ${Formatters.toRupiah(invoice.discount)}', isDiscount: true),

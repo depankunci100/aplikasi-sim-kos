@@ -292,3 +292,84 @@ proof_file: [FILE BINER JPG/PNG/PDF, Max 5MB]
   }
 }
 ```
+
+---
+
+## 4. Utilitas, Meteran & Integrasi Invoice (Phase 4)
+
+Semua endpoint utilitas membutuhkan token `Bearer` via Sanctum (`auth:sanctum`).
+
+| Endpoint | Method | Role yang Diizinkan | Deskripsi |
+|---|---|---|---|
+| `/api/v1/utilities/meters` | GET | Semua (Terfilter) | Daftar master meter utilitas fisik |
+| `/api/v1/utilities/meters` | POST | Owner, Manager, Super Admin | Daftarkan meter fisik baru |
+| `/api/v1/utilities/meters/{id}` | GET | Owner, Manager, Staff, Super Admin | Detail meter & riwayat pembacaan |
+| `/api/v1/utilities/meters/{id}` | PUT | Owner, Manager, Super Admin | Perbarui konfigurasi meter |
+| `/api/v1/utilities/tariffs` | GET | Owner, Manager, Kasir, Super Admin | Daftar tarif utilitas per properti |
+| `/api/v1/utilities/tariffs` | POST | Owner, Manager, Super Admin | Konfigurasi tarif baru dengan masa berlaku |
+| `/api/v1/utilities/tariffs/effective` | GET | Semua Terotentikasi | Dapatkan tarif aktif pada tanggal tertentu |
+| `/api/v1/utilities/readings` | GET | Semua (Terfilter) | Riwayat pencatatan pembacaan meter |
+| `/api/v1/utilities/readings` | POST | Staff, Manager, Owner, Super Admin | Catat pembacaan meter baru (upload foto privat) |
+| `/api/v1/utilities/readings/{id}` | GET | Semua yang Terotorisasi | Detail pembacaan & kalkulasi pemakaian |
+| `/api/v1/utilities/readings/{id}/review` | POST | Owner, Manager, Kasir, Super Admin | Setujui atau tolak pembacaan meter |
+| `/api/v1/utilities/readings/{id}/correct` | POST | Owner, Manager, Super Admin | Koreksi nilai meter dengan audit trail ketat |
+| `/api/v1/utilities/readings/{id}/preview-bill` | GET | Owner, Manager, Kasir, Super Admin | Pratinjau perhitungan tagihan utilitas |
+| `/api/v1/utilities/readings/{id}/generate-invoice` | POST | Owner, Manager, Kasir, Super Admin | Terbitkan tagihan ke sistem invoice existing (Idempoten) |
+| `/api/v1/utilities/readings/{id}/proof-photo` | GET | Staff, Owner, Tenant Terkait | Streaming foto bukti fisik privat |
+| `/api/v1/utilities/tenant/consumption` | GET | Tenant | Riwayat pemakaian utilitas kamar sendiri |
+
+#### Contoh Payload Pendaftaran Meter: `POST /api/v1/utilities/meters`
+```json
+{
+  "property_id": 1,
+  "room_id": 10,
+  "utility_type": "electricity",
+  "meter_number": "PLN-101-A",
+  "meter_type": "individual",
+  "unit": "kWh",
+  "initial_reading": 1250.00,
+  "installed_at": "2026-10-15"
+}
+```
+
+#### Contoh Payload Pencatatan Meter: `POST /api/v1/utilities/readings`
+```http
+POST /api/v1/utilities/readings HTTP/1.1
+Content-Type: multipart/form-data
+
+meter_id=1
+current_meter=1330.00
+reading_date=2026-10-15
+proof_photo=@/path/to/meter_display.jpg
+notes=Segel fisik aman, display jernih
+status=pending_review
+```
+
+#### Contoh Response Detail & Kalkulasi: `GET /api/v1/utilities/readings/{id}`
+```json
+{
+  "success": true,
+  "message": "Detail pembacaan meter berhasil diambil.",
+  "data": {
+    "id": 12,
+    "meter_id": 1,
+    "previous_meter": "1250.00",
+    "current_meter": "1330.00",
+    "usage": "80.00",
+    "rate_per_unit": "1500.00",
+    "total_cost": "120000.00",
+    "reading_date": "2026-10-15",
+    "status": "approved",
+    "is_billed": false
+  }
+}
+```
+
+#### Contoh Payload Penerbitan Tagihan Utilitas: `POST /api/v1/utilities/readings/{id}/generate-invoice`
+```json
+{
+  "target_invoice_id": null
+}
+```
+*Keterangan:* Jika `target_invoice_id` disetel `null`, sistem otomatis menerbitkan invoice utilitas mandiri (`INV-UTL-...`). Jika `target_invoice_id` diisi, line item utilitas akan dilampirkan ke invoice sewa yang sedang aktif. Upaya penagihan kedua otomatis ditolak dengan pesan error dan status 422 (Anti-Double Billing).
+

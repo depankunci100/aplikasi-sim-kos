@@ -101,6 +101,16 @@
                             <i class="bi bi-clipboard2-check me-1"></i> Inspeksi Kamar
                         </a>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('dashboard.utilities.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-speedometer2 me-1"></i> Utilitas & Meter
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ route('dashboard.utilities.meters.index') }}"><i class="bi bi-speedometer me-2"></i>Daftar Meter Listrik/Air</a></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.utilities.readings.index') }}"><i class="bi bi-journal-check me-2"></i>Pencatatan & Review</a></li>
+                            <li><a class="dropdown-item" href="{{ route('dashboard.utilities.tariffs.index') }}"><i class="bi bi-tags me-2"></i>Pengaturan Tarif</a></li>
+                        </ul>
+                    </li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <div class="text-end d-none d-sm-block">

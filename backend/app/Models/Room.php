@@ -52,6 +52,16 @@ class Room extends Model
         return $this->hasMany(Inspection::class);
     }
 
+    public function utilityMeters(): HasMany
+    {
+        return $this->hasMany(UtilityMeter::class);
+    }
+
+    public function utilityReadings(): HasMany
+    {
+        return $this->hasMany(UtilityReading::class);
+    }
+
     public function isAvailable(): bool
     {
         return $this->is_active && $this->status === RoomStatus::AVAILABLE;

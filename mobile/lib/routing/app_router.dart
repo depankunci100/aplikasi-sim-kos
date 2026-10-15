@@ -14,6 +14,9 @@ import '../features/profile/screens/profile_screen.dart';
 import '../features/properties/models/property_model.dart';
 import '../features/properties/screens/home_screen.dart';
 import '../features/properties/screens/property_detail_screen.dart';
+import '../features/utilities/models/utility_meter_model.dart';
+import '../features/utilities/screens/utility_meters_screen.dart';
+import '../features/utilities/screens/record_meter_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -36,6 +39,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/inspections',
         builder: (context, state) => const InspectionsScreen(),
+      ),
+      GoRoute(
+        path: '/utilities',
+        builder: (context, state) => const UtilityMetersScreen(),
+      ),
+      GoRoute(
+        path: '/utilities/record',
+        builder: (context, state) {
+          final meter = state.extra as UtilityMeterModel? ??
+              UtilityMeterModel(
+                id: 1,
+                propertyId: 1,
+                utilityType: 'electricity',
+                meterNumber: 'PLN-DEFAULT',
+                meterType: 'individual',
+                unit: 'kWh',
+                initialReading: 0,
+                currentReading: 0,
+              );
+          return RecordMeterScreen(meter: meter);
+        },
       ),
       GoRoute(
         path: '/inspection/:id',

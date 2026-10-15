@@ -46,4 +46,9 @@ class ApiEndpoints {
   static const String invoices = '/invoices';
   static const String inspections = '/inspections';
   static const String complaints = '/complaints';
+
+  static const String utilityMeters = '/utilities/meters';
+  static const String utilityReadings = '/utilities/readings';
+  static const String utilityTariffs = '/utilities/tariffs';
+  static const String tenantConsumption = '/utilities/tenant/consumption';
 }

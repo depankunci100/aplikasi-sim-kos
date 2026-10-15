@@ -58,4 +58,19 @@ class Property extends Model
     {
         return $this->hasMany(Inspection::class);
     }
+
+    public function utilityMeters(): HasMany
+    {
+        return $this->hasMany(UtilityMeter::class);
+    }
+
+    public function utilityTariffs(): HasMany
+    {
+        return $this->hasMany(UtilityTariff::class);
+    }
+
+    public function utilityReadings(): HasMany
+    {
+        return $this->hasMany(UtilityReading::class);
+    }
 }

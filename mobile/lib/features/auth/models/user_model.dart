@@ -40,4 +40,10 @@ class UserModel {
       'avatar_url': avatarUrl,
     };
   }
+
+  bool get isTenant => role == 'tenant';
+  bool get isOwner => role == 'owner';
+  bool get isManager => role == 'manager';
+  bool get isStaff => role == 'staff' || role == 'receptionist';
+  bool get isSuperAdmin => role == 'super_admin';
 }

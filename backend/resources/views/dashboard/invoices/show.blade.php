@@ -75,14 +75,41 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>
-                        <strong>Biaya Sewa Pokok ({{ strtoupper($invoice->invoice_type) }})</strong>
-                        <div class="small text-muted">Biaya pemakaian unit kamar untuk periode yang disepakati.</div>
-                    </td>
-                    <td class="text-center"><span class="badge bg-light text-dark border">Sewa</span></td>
-                    <td class="text-end fw-semibold">Rp {{ number_format($invoice->subtotal, 0, ',', '.') }}</td>
-                </tr>
+                @if($invoice->items->isNotEmpty())
+                    @foreach($invoice->items as $item)
+                    <tr>
+                        <td>
+                            <strong>{{ $item->name }}</strong>
+                            @if(!empty($item->metadata))
+                                <div class="small text-muted">
+                                    Meter: <code>#{{ $item->metadata['meter_number'] ?? '-' }}</code> |
+                                    Sebelumnya: {{ $item->metadata['previous_meter'] ?? '-' }} &rarr; Pembacaan: {{ $item->metadata['current_meter'] ?? '-' }}
+                                    ({{ $item->quantity }} {{ $item->unit }} &times; Rp {{ number_format($item->rate, 0, ',', '.') }})
+                                </div>
+                            @elseif($item->unit)
+                                <div class="small text-muted">{{ $item->quantity }} {{ $item->unit }} &times; Rp {{ number_format($item->rate, 0, ',', '.') }}</div>
+                            @endif
+                        </td>
+                        <td class="text-center">
+                            @if(in_array($item->item_type, ['electricity', 'water', 'utility']))
+                                <span class="badge bg-info-subtle text-info border border-info-subtle"><i class="bi bi-lightning-charge me-1"></i>{{ ucfirst($item->item_type) }}</span>
+                            @else
+                                <span class="badge bg-light text-dark border">{{ ucfirst($item->item_type) }}</span>
+                            @endif
+                        </td>
+                        <td class="text-end fw-semibold">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
+                    </tr>
+                    @endforeach
+                @else
+                    <tr>
+                        <td>
+                            <strong>Biaya Sewa Pokok ({{ strtoupper($invoice->invoice_type) }})</strong>
+                            <div class="small text-muted">Biaya pemakaian unit kamar untuk periode yang disepakati.</div>
+                        </td>
+                        <td class="text-center"><span class="badge bg-light text-dark border">Sewa</span></td>
+                        <td class="text-end fw-semibold">Rp {{ number_format($invoice->subtotal, 0, ',', '.') }}</td>
+                    </tr>
+                @endif
                 @if($invoice->discount > 0)
                 <tr>
                     <td class="text-success">Potongan Harga / Diskon Promo</td>

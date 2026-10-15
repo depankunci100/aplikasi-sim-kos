@@ -31,6 +31,11 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.speed_rounded),
+            tooltip: 'Meter Utilitas',
+            onPressed: () => context.push('/utilities'),
+          ),
+          IconButton(
             icon: const Icon(Icons.fact_check_rounded),
             tooltip: 'Inspeksi Kamar',
             onPressed: () => context.push('/inspections'),
@@ -178,6 +183,44 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                       Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.orange),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Quick Action Card for Utilitas & Meteran
+              InkWell(
+                onTap: () => context.push('/utilities'),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.teal.withAlpha(80)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.speed_rounded, color: Colors.teal, size: 28),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Utilitas & Meteran Listrik/Air',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Catat meteran kamar, pantau pemakaian kWh/m³, dan cek rincian tagihan',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.teal),
                     ],
                   ),
                 ),

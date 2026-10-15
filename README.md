@@ -65,7 +65,15 @@ aplikasi-sim-kos/
    - Hak konfirmasi persetujuan (`approve`) atau pengajuan keberatan (`object`) bagi penyewa dengan batas tenggat waktu.
    - Komparasi cerdas kondisi check-out vs baseline check-in dengan kalkulasi otomatis estimasi biaya kerusakan pemotong deposit.
    - Rekam audit trail lengkap (`inspection_logs`) untuk setiap tahapan aksi.
-5. **Mobile Experience (Flutter)**:
+6. **Pengelolaan Utilitas, Meteran & Integrasi Invoice (Tahap 4)**:
+   - Master meter fisik listrik (`kWh`) dan air (`m³`) individual per kamar atau komunal/bersama.
+   - Pengaturan tarif per properti dengan rentang masa berlaku prospektif (non-retroaktif, tidak mengubah invoice historis).
+   - Validasi pembacaan meter: baseline pembacaan pertama bawaan pabrik, penolakan angka mundur, dan kalkulasi pemakaian non-negatif.
+   - Upload foto display meteran fisik ke storage privat dengan streaming terotentikasi.
+   - Alur review kasir/manajer: persetujuan, penolakan dengan alasan wajib, dan koreksi berizin dengan audit trail lengkap (`utility_reading_logs`).
+   - Integrasi tagihan ke invoice existing via `invoice_items` breakdown, diproteksi transaksi database dengan row-level lock (`lockForUpdate`) menjamin anti-double billing (idempoten).
+   - Dukungan penuh di Web Dashboard Bootstrap 5 dan aplikasi Flutter Mobile (Android/iOS).
+7. **Mobile Experience (Flutter)**:
    - UI modern berbasis Material Design 3 dengan bahasa Indonesia.
    - State management reaktif menggunakan **Riverpod**.
    - Navigasi deklaratif dengan **GoRouter**.

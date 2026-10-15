@@ -48,7 +48,7 @@ class InvoiceWebController extends Controller
     {
         $user = Auth::user();
 
-        $query = Invoice::with(['property', 'booking.room.roomType', 'user', 'payments.verifier']);
+        $query = Invoice::with(['property', 'booking.room.roomType', 'user', 'payments.verifier', 'items']);
 
         if (!$user->isSuperAdmin()) {
             $propertyIds = DB::table('property_users')->where('user_id', $user->id)->pluck('property_id');

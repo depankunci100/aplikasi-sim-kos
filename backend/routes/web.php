@@ -6,6 +6,7 @@ use App\Http\Controllers\Web\InspectionWebController;
 use App\Http\Controllers\Web\InvoiceWebController;
 use App\Http\Controllers\Web\PaymentVerificationController;
 use App\Http\Controllers\Web\RoomWebController;
+use App\Http\Controllers\Web\UtilityWebController;
 use Illuminate\Support\Facades\Route;
 
 // Redirect root to dashboard or login
@@ -53,5 +54,30 @@ Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(functi
     // Rooms Housekeeping & Maintenance (Staff, Kasir, Manager, Owner, Super Admin)
     Route::middleware('role:super_admin,owner,manager,receptionist,staff')->group(function () {
         Route::post('/rooms/{id}/status', [RoomWebController::class, 'updateStatus'])->name('rooms.status');
+    });
+
+    // Utilities: Meters, Tariffs, Readings, Reviews & Invoicing
+    Route::middleware('role:super_admin,owner,manager,receptionist,staff')->prefix('utilities')->name('utilities.')->group(function () {
+        // Meters
+        Route::get('/meters', [UtilityWebController::class, 'indexMeters'])->name('meters.index');
+        Route::get('/meters/create', [UtilityWebController::class, 'createMeter'])->name('meters.create');
+        Route::post('/meters', [UtilityWebController::class, 'storeMeter'])->name('meters.store');
+        Route::get('/meters/{id}', [UtilityWebController::class, 'showMeter'])->name('meters.show');
+        Route::get('/meters/{id}/edit', [UtilityWebController::class, 'editMeter'])->name('meters.edit');
+        Route::put('/meters/{id}', [UtilityWebController::class, 'updateMeter'])->name('meters.update');
+
+        // Tariffs
+        Route::get('/tariffs', [UtilityWebController::class, 'indexTariffs'])->name('tariffs.index');
+        Route::post('/tariffs', [UtilityWebController::class, 'storeTariff'])->name('tariffs.store');
+
+        // Readings & Reviews
+        Route::get('/readings', [UtilityWebController::class, 'indexReadings'])->name('readings.index');
+        Route::get('/readings/create', [UtilityWebController::class, 'createReading'])->name('readings.create');
+        Route::post('/readings', [UtilityWebController::class, 'storeReading'])->name('readings.store');
+        Route::get('/readings/{id}', [UtilityWebController::class, 'showReading'])->name('readings.show');
+        Route::post('/readings/{id}/review', [UtilityWebController::class, 'reviewReading'])->name('readings.review');
+        Route::post('/readings/{id}/correct', [UtilityWebController::class, 'correctReading'])->name('readings.correct');
+        Route::post('/readings/{id}/generate-invoice', [UtilityWebController::class, 'generateInvoice'])->name('readings.generate-invoice');
+        Route::get('/readings/{id}/proof', [UtilityWebController::class, 'streamProof'])->name('readings.proof');
     });
 });

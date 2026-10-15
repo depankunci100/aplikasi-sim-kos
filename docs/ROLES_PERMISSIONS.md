@@ -36,7 +36,11 @@ Keterangan:
 | **Pemesanan Kos (Bulanan)** | CRUD | R | CRUD | CRU | - | CR (Milik sendiri) |
 | **Reservasi Guesthouse (Harian)** | CRUD | R | CRUD | CRUD | - | CR (Milik sendiri) |
 | **Proses Check-In & Check-Out** | CRUD | R | CRU | CRU | U (Kesiapan) | R (Status sendiri) |
-| **Pencatatan Meteran Listrik/Air** | CRUD | R | CRUD | CR | CR | R (Riwayat sendiri)|
+| **Master Meter Fisik** | CRUD | CRUD (Miliknya)| CRUD (Cabang)| R | - | - |
+| **Pengaturan Tarif Utilitas** | CRUD | CRUD (Miliknya)| CRUD (Cabang)| R | - | - |
+| **Pencatatan Meteran Listrik/Air** | CRUD | CRUD | CRUD | CR | CR (Pelaksana) | R (Kamar Sendiri)|
+| **Review & Koreksi Nilai Meter** | CRUD | CRUD | CRUD | RU (Review) | - | - |
+| **Penerbitan Invoice Utilitas** | CRUD | CRUD | CRUD | CR (Kasir) | - | - |
 | **Tagihan & Invoice** | CRUD | R | CRUD | CRU | - | R (Tagihan sendiri)|
 | **Pembayaran & Verifikasi** | CRUD | R | CRUD | CRU (Kasir) | - | CR (Upload Bukti) |
 | **Pengeluaran Operasional (Expense)**| CRUD | CRUD | CRUD | C (Kasir) | - | - |
@@ -65,5 +69,11 @@ Keterangan:
    - **Staff**: Melaksanakan inspeksi yang ditugaskan, mengisi kondisi checklist, catatan, dan mengunggah foto bukti fisik. Staf pelaksana tidak otomatis berhak mengubah invoice atau memverifikasi pembayaran.
    - **Receptionist / Kasir**: Hanya melihat ringkasan status inspeksi untuk operasional serah terima kunci. Tidak dapat mengedit checklist atau menyetujui laporan atas nama penyewa.
    - **Tenant / Penyewa**: Hanya melihat inspeksi kamar miliknya. Berhak menyetujui (`approve`) atau mengajukan keberatan (`object`) sebelum tenggat `tenant_due_at`. Penyewa tidak dapat mengubah checklist, foto, atau laporan yang dibuat petugas.
-7. **Audit Trail**:
-   Aksi kritis seperti verifikasi pembayaran (`verified_by`, `verified_at`, `verification_notes`), penolakan bukti (`rejection_reason`), pembatalan booking, perubahan harga kamar, persetujuan pengeluaran, serta setiap tahapan inspeksi (`inspection_logs`) dicatat dengan cap `user_id` dan `timestamp`.
+7. **Otorisasi & Batasan Utilitas Meteran (Tahap 4)**:
+   - **Super Admin**: Akses penuh lintas properti dan audit log koreksi.
+   - **Owner & Manager**: Berwenang membuat/mengedit master meter fisik, menetapkan tarif dengan masa berlaku, meninjau pembacaan (`review`), melakukan koreksi teknis (`correct`), dan menerbitkan tagihan invoice.
+   - **Receptionist / Kasir**: Berwenang melihat komponen tagihan utilitas pada invoice existing, meninjau pembacaan, dan menerbitkan tagihan invoice utilitas. Kasir *tidak otomatis* memiliki hak untuk merekayasa atau mengubah pembacaan meter fisik di luar alur review sah.
+   - **Staff**: Berwenang mencatat nilai meter fisik lapangan (`record`) dan mengunggah foto bukti display. Staf tidak memiliki hak administratif untuk menetapkan tarif atau menerbitkan invoice finansial.
+   - **Tenant / Penyewa**: Hanya berhak melihat riwayat pemakaian dan rincian tarif untuk kamar miliknya sendiri (`tenant_consumption`). Penyewa *tidak dapat* mengubah pembacaan meter resmi atau memanipulasi jumlah tagihan final.
+8. **Audit Trail Mutlak**:
+   Aksi kritis seperti verifikasi pembayaran (`verified_by`, `verified_at`), penolakan bukti (`rejection_reason`), pembatalan booking, perubahan harga kamar, inspeksi (`inspection_logs`), serta seluruh mutasi pembacaan, koreksi, dan penagihan utilitas (`utility_reading_logs`) dicatat secara permanen dengan `user_id`, aksi, data sebelum/sesudah, dan cap waktu.

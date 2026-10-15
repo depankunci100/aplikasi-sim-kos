@@ -33,12 +33,20 @@ erDiagram
     BOOKINGS ||--o{ INSPECTIONS : "memiliki serah terima"
 
     INVOICES ||--o{ PAYMENTS : "dilunasi dengan"
+    INVOICES ||--o{ INVOICE_ITEMS : "memiliki rincian item"
+    INVOICES ||--o{ UTILITY_READINGS : "menagihkan pembacaan"
 
     PROPERTIES ||--o{ INSPECTIONS : "memiliki riwayat inspeksi"
     ROOMS ||--o{ INSPECTIONS : "diinspeksi"
     INSPECTIONS ||--o{ INSPECTION_ITEMS : "memiliki checklist item"
     INSPECTIONS ||--o{ INSPECTION_MEDIA : "memiliki bukti foto"
     INSPECTIONS ||--o{ INSPECTION_LOGS : "memiliki jejak audit"
+
+    PROPERTIES ||--o{ UTILITY_METERS : "memiliki meter fisik"
+    PROPERTIES ||--o{ UTILITY_TARIFFS : "memiliki konfigurasi tarif"
+    ROOMS ||--o{ UTILITY_METERS : "memiliki meter kamar"
+    UTILITY_METERS ||--o{ UTILITY_READINGS : "memiliki riwayat pembacaan"
+    UTILITY_READINGS ||--o{ UTILITY_READING_LOGS : "memiliki jejak audit"
 
     USERS {
         bigint id PK
@@ -355,6 +363,58 @@ erDiagram
   - `FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE`
   - `FOREIGN KEY (user_id) REFERENCES users(id)`
 
+### Tabel: `utility_meters`
+- **Fungsi**: Master data fisik meter utilitas listrik (kWh) dan air (m³) per kamar individual atau komunal/bersama.
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `UNIQUE (meter_number)`
+  - `INDEX (property_id, utility_type, is_active)`
+  - `INDEX (room_id, utility_type)`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL`
+
+### Tabel: `utility_tariffs`
+- **Fungsi**: Riwayat dan konfigurasi tarif utilitas per properti dan jenis utilitas dengan tanggal masa berlaku efektif.
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (property_id, utility_type, is_active)`
+  - `INDEX (effective_from, effective_to)`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `utility_readings` (Diperluas)
+- **Fungsi**: Pencatatan nilai meter berkala, perhitungan pemakaian ($current - previous$), snapshot tarif, foto bukti privat, dan status review/billing.
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (meter_id)`
+  - `INDEX (property_id)`
+  - `INDEX (room_id)`
+  - `INDEX (status)`
+  - `INDEX (is_billed)`
+  - `FOREIGN KEY (meter_id) REFERENCES utility_meters(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `utility_reading_logs`
+- **Fungsi**: Jejak audit mutlak untuk setiap tindakan pencatatan, persetujuan, penolakan, koreksi, dan penagihan ke invoice.
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (utility_reading_id, created_at)`
+  - `FOREIGN KEY (utility_reading_id) REFERENCES utility_readings(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `invoice_items`
+- **Fungsi**: Rincian butir tagihan (line items breakdown) pada invoice existing untuk sewa, listrik, air, denda, dan layanan dengan snapshot tarif, volume, dan metadata pembacaan.
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (invoice_id, item_type)`
+  - `FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE`
+
 ---
 
 ## 3. Aturan Integritas & Anti-Double Booking
@@ -365,5 +425,10 @@ erDiagram
    dengan status `IN ('confirmed', 'active')`.
 2. **Kunci Kamar Saat Maintenance**:
    Kamar berstatus `maintenance` atau `dirty` tidak dapat dipilih untuk booking instan sebelum statusnya dikembalikan ke `available` oleh staf housekeeping/pengelola.
-3. **Penyimpanan Nilai Uang**:
-   Seluruh nilai uang menggunakan tipe data `DECIMAL(14, 2)` guna mencegah kehilangan presisi akibat floating point rounding.
+3. **Penyimpanan Nilai Uang & Presisi Utilitas**:
+   Seluruh nilai uang, tarif, dan kuantitas meter menggunakan tipe data `DECIMAL(14, 2)` guna mencegah kehilangan presisi akibat floating point rounding.
+4. **Idempotensi & Pencegahan Tagihan Ganda (Anti-Double Billing)**:
+   Setiap pembacaan meter yang disetujui hanya dapat diterbitkan menjadi tagihan tepat satu kali (`is_billed = true` dan `invoice_id` terkunci). Operasi penagihan utilitas dilindungi oleh transaksi database dengan row-level lock (`lockForUpdate`). Upaya kedua otomatis ditolak dengan `422 Unprocessable Content`.
+5. **Baseline Pembacaan Pertama & Non-Retroaktivitas Tarif**:
+   Pembacaan pertama untuk kamar/meter baru wajib menggunakan `meter.initial_reading` sebagai baseline pembacaan sebelumnya agar penyewa baru tidak menanggung akumulasi meteran historis. Perubahan tarif baru berlaku prospektif dan tidak boleh mengubah angka tagihan atau pembacaan masa lalu secara otomatis.
+

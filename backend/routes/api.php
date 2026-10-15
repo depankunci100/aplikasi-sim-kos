@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PropertyController;
 use App\Http\Controllers\Api\V1\RoomController;
+use App\Http\Controllers\Api\V1\UtilityController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -61,5 +62,25 @@ Route::prefix('v1')->group(function () {
         Route::post('/inspections/{id}/approve', [InspectionController::class, 'approve']);
         Route::post('/inspections/{id}/object', [InspectionController::class, 'object']);
         Route::get('/inspections/{id}/compare/{baselineId}', [InspectionController::class, 'compare']);
+
+        // Utility Meters, Tariffs, Readings & Invoicing
+        Route::get('/utilities/meters', [UtilityController::class, 'indexMeters']);
+        Route::post('/utilities/meters', [UtilityController::class, 'storeMeter']);
+        Route::get('/utilities/meters/{id}', [UtilityController::class, 'showMeter']);
+        Route::put('/utilities/meters/{id}', [UtilityController::class, 'updateMeter']);
+
+        Route::get('/utilities/tariffs', [UtilityController::class, 'indexTariffs']);
+        Route::post('/utilities/tariffs', [UtilityController::class, 'storeTariff']);
+        Route::get('/utilities/tariffs/effective', [UtilityController::class, 'getEffectiveTariff']);
+
+        Route::get('/utilities/readings', [UtilityController::class, 'indexReadings']);
+        Route::post('/utilities/readings', [UtilityController::class, 'storeReading']);
+        Route::get('/utilities/readings/{id}', [UtilityController::class, 'showReading']);
+        Route::post('/utilities/readings/{id}/review', [UtilityController::class, 'reviewReading']);
+        Route::post('/utilities/readings/{id}/correct', [UtilityController::class, 'correctReading']);
+        Route::get('/utilities/readings/{id}/preview-bill', [UtilityController::class, 'previewBill']);
+        Route::post('/utilities/readings/{id}/generate-invoice', [UtilityController::class, 'generateInvoice']);
+        Route::get('/utilities/readings/{id}/proof-photo', [UtilityController::class, 'proofPhoto']);
+        Route::get('/utilities/tenant/consumption', [UtilityController::class, 'tenantConsumption']);
     });
 });

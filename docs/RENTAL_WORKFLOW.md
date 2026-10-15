@@ -195,3 +195,62 @@ stateDiagram-v2
    - Penyewa memiliki jendela konfirmasi (default: 3 hari sejak status `completed`).
    - Jika ada ketidaksesuaian fasilitas, penyewa mengajukan catatan keberatan melalui aplikasi mobile atau web dashboard. Staf/manajer kemudian memeriksa ulang dan merevisi butir terkait dengan riwayat audit trail yang tercatat utuh.
 
+---
+
+## 4. Alur Kerja Pengelolaan Utilitas & Integrasi Tagihan (Tahap 4)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Staff as Staf / Pemeriksa
+    actor OwnerKasir as Owner / Manajer / Kasir
+    actor Tenant as Penyewa Kamar
+    participant Meter as Master Meter & Tarif
+    participant Reading as UtilityReading Engine
+    participant InvoiceSys as Invoice Existing (INV-UTL)
+    participant PaySys as Payment Lifecycle Existing
+
+    Note over Staff,Meter: 1. Serah Terima Awal & Baseline
+    Staff->>Meter: Registrasi Meter & Rekam Baseline Awal (initial_reading)
+
+    Note over Staff,Reading: 2. Pencatatan Berkala (Bulanan / Check-Out)
+    Staff->>Reading: Input Angka Display Terkini + Upload Foto Bukti Privat
+    Reading->>Reading: Validasi Baseline & Cegah Angka Mundur (Current >= Previous)
+    Reading->>Reading: Ambil Snapshot Tarif Aktif & Hitung Pemakaian Bersih
+
+    Note over OwnerKasir,Reading: 3. Review & Approval
+    OwnerKasir->>Reading: Review Angka & Foto Bukti Fisik (Disetujui / Ditolak)
+    alt Jika Angka Salah Input
+        OwnerKasir->>Reading: Koreksi Nilai (Tercatat di utility_reading_logs)
+    end
+
+    Note over OwnerKasir,InvoiceSys: 4. Siklus Penerbitan Tagihan (Idempoten)
+    OwnerKasir->>InvoiceSys: Pratinjau Biaya & Terbitkan Tagihan (lockForUpdate)
+    InvoiceSys->>InvoiceSys: Buat InvoiceItem Snapshot (Volume, Satuan, Tarif, Nominal)
+    InvoiceSys->>Reading: Set is_billed = true & Simpan invoice_id (Cegah Tagihan Ganda)
+
+    Note over Tenant,PaySys: 5. Pembayaran & Pelunasan
+    Tenant->>PaySys: Cek Tagihan di Mobile / Web & Unggah Bukti Bayar
+    OwnerKasir->>PaySys: Verifikasi Pembayaran Manual -> Status LUNAS
+```
+
+### Penjelasan Tahapan Alur Kerja Utilitas:
+1. **Penetapan Baseline Kamar Baru / Check-In**:
+   - Saat kamar mulai disewakan, meteran fisik yang terpasang memiliki nilai awal (`initial_reading`).
+   - Sistem menetapkan angka ini sebagai baseline pembacaan pertama sehingga penyewa tidak pernah ditagihkan angka bawaan pabrik atau sisa penghuni lama.
+2. **Pencatatan Berkala & Validasi Server-Side**:
+   - Staf memeriksa display fisik meter dan mengunggah foto display via mobile Flutter atau web dashboard.
+   - Server memvalidasi bahwa nilai pembacaan tidak boleh lebih kecil dari pembacaan sebelumnya ($current \ge previous$).
+   - Sistem secara otomatis mencari tarif aktif pada tanggal pembacaan tersebut (`effective_from` s/d `effective_to`) dan mengunci snapshot tarifnya.
+3. **Pemeriksaan & Review Kasir/Manajer**:
+   - Pembacaan masuk ke tab "Menunggu Review" di dashboard. Kasir/Manajer memeriksa kejelasan foto bukti display meteran.
+   - Jika foto buram atau salah, Manajer menolak dengan alasan penolakan wajib (`rejection_reason`).
+   - Jika terdapat salah ketik teknis, Manajer dapat melakukan koreksi berizin dengan audit trail lengkap (`utility_reading_logs`).
+4. **Penerbitan Tagihan Idempoten ke Invoice Existing**:
+   - Tagihan utilitas diterbitkan ke sistem invoice existing tanpa membuat modul pembayaran terpisah.
+   - Tagihan mencatat line item `invoice_items` lengkap dengan kuantitas pemakaian, satuan (`kWh`/`m³`), tarif satuan, total nominal, dan metadata meter.
+   - Row-level lock (`lockForUpdate`) menjamin invoice utilitas **tidak akan pernah terbit ganda** meskipun terjadi request bersamaan atau klik ganda.
+5. **Pelunasan Menggunakan Sistem Pembayaran Existing**:
+   - Pembayaran tagihan utilitas menggunakan alur kuitansi, pengajuan bukti transfer, dan verifikasi manual kasir (`Payment` lifecycle) yang sudah teruji sejak Tahap 2.
+
+

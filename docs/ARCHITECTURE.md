@@ -215,3 +215,43 @@ Berada pada `app/Services/Inspection/InspectionService.php`, merangkum seluruh a
 
 ### C. Audit Trail Terintegrasi (`inspection_logs`)
 Setiap aksi signifikan (pembuatan jadwal, mulai inspeksi, update butir checklist, unggah foto, penyelesaian inspeksi, persetujuan penyewa, serta keberatan) dicatat secara permanen dengan `user_id`, aksi, deskripsi, dan metadata kontekstual.
+
+---
+
+## 7. Arsitektur Pengelolaan Utilitas, Pelacakan Konsumsi & Integrasi Invoice (Tahap 4)
+
+### A. Domain Service: `UtilityService`
+Berada pada `app/Services/Utility/UtilityService.php`, merangkum seluruh aturan bisnis utilitas, meteran listrik (kWh), meteran air (m³), pengelolaan tarif, serta penerbitan tagihan:
+1. **Master Meter Fisik**:
+   - Mendukung skenario utama meteran individual kamar (`room_id`) serta extensible untuk meteran bersama/komunal (`meter_type: shared`).
+   - Mencegah duplikasi meteran aktif untuk kamar dan jenis utilitas yang sama (`property_id + room_id + utility_type + is_active`).
+   - Menyimpan baseline awal (`initial_reading`), pembacaan terkini (`current_reading`), dan kapasitas maksimal jika fisik meter mendukung rollover (`max_reading`).
+
+2. **Mesin Kalkulasi Konsumsi & Baseline**:
+   - Untuk meteran kumulatif:
+     $$\text{Pemakaian (Usage)} = \text{Pembacaan Terkini (Current)} - \text{Pembacaan Sebelumnya (Previous)}$$
+     $$\text{Jumlah Tagihan (Total Cost)} = \text{Pemakaian} \times \text{Tarif Berlaku (Rate per Unit)}$$
+   - **Baseline Pembacaan Pertama**: Jika belum ada pembacaan sebelumnya yang disetujui, sistem wajib menggunakan `meter.initial_reading` sebagai baseline pembacaan sebelumnya. Hal ini menjamin penyewa baru tidak menanggung angka kumulatif historis bawaan pabrik/periode sebelumnya.
+   - **Validasi Mundurnya Angka**: Pembacaan baru tidak boleh lebih kecil dari pembacaan sebelumnya ($\text{Current} \ge \text{Previous}$). Sistem menolak otomatis rollover tanpa aturan atau pembacaan acak. Rollover harus dikonfigurasi secara eksplisit pada kapasitas meter atau melalui alur koreksi berizin.
+   - Nilai pemakaian tidak boleh negatif.
+
+3. **Pengelolaan Tarif Prospektif & Immutabilitas**:
+   - Tarif dikonfigurasi per properti dan jenis utilitas dengan tanggal masa berlaku (`effective_from` s/d `effective_to`).
+   - Nilai uang disimpan dalam `DECIMAL(14, 2)` untuk akurasi pembulatan dan perhitungan.
+   - **Non-Retroaktivitas**: Ketika tarif baru ditetapkan, pembacaan historis dan invoice yang telah diterbitkan *tidak akan pernah berubah secara otomatis*. Setiap pembacaan dan invoice merekam snapshot tarif dan total biaya secara permanen.
+
+4. **Integrasi Tagihan ke Sistem Invoice Existing (Tanpa Modul Terpisah)**:
+   - Menggunakan model `Invoice` existing dan sistem pembayaran manual existing (`Payment` lifecycle).
+   - Menambahkan tabel breakdown `invoice_items` (`quantity`, `unit`, `rate`, `amount`, `metadata`).
+   - **Idempotensi & Pencegahan Tagihan Ganda (Anti-Double Billing)**:
+     - Pembacaan yang sudah berstatus `is_billed = true` atau memiliki `invoice_id` tidak dapat ditagihkan kembali.
+     - Operasi penerbitan tagihan utilitas dieksekusi di dalam `DB::transaction()` dengan row-level lock (`lockForUpdate()`).
+     - Menyediakan dua mode: menerbitkan Invoice utilitas khusus (`INV-UTL-...`) atau melampirkan line item ke invoice sewa berjalan milik penyewa kamar.
+
+5. **Keamanan Foto Bukti Privat**:
+   - File bukti foto display angka meteran diunggah ke storage privat lokal (`storage/app/private/utility_proofs/{meter_id}/`).
+   - Akses foto hanya dapat dilakukan melalui endpoint terotentikasi (`/api/v1/utilities/readings/{id}/proof-photo` dan `/dashboard/utilities/readings/{id}/proof`) yang memeriksa apakah pengguna adalah Admin, Manajer/Staf properti tersebut, atau Penyewa kamar terkait.
+
+6. **Audit Trail Pencatatan & Koreksi (`utility_reading_logs`)**:
+   - Merekam setiap state transition: `recorded`, `approved`, `rejected` (wajib menyertakan alasan penolakan), `corrected` (merekam nilai lama, nilai baru, alasan koreksi, dan aktor), serta `billed`.
+

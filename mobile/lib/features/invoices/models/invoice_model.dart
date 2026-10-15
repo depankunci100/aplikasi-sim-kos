@@ -1,3 +1,4 @@
+import '../../utilities/models/invoice_item_model.dart';
 import 'payment_model.dart';
 
 class InvoiceModel {
@@ -17,6 +18,7 @@ class InvoiceModel {
   final DateTime? paidAt;
   final DateTime? createdAt;
   final List<PaymentModel> payments;
+  final List<InvoiceItemModel> items;
 
   InvoiceModel({
     required this.id,
@@ -35,11 +37,17 @@ class InvoiceModel {
     this.paidAt,
     this.createdAt,
     this.payments = const [],
+    this.items = const [],
   });
 
   factory InvoiceModel.fromJson(Map<String, dynamic> json) {
     final paymentsList = (json['payments'] as List<dynamic>?)
             ?.map((e) => PaymentModel.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    final itemsList = (json['items'] as List<dynamic>?)
+            ?.map((e) => InvoiceItemModel.fromJson(e as Map<String, dynamic>))
             .toList() ??
         [];
 
@@ -66,6 +74,7 @@ class InvoiceModel {
       paidAt: json['paid_at'] != null ? DateTime.tryParse(json['paid_at'].toString()) : null,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       payments: paymentsList,
+      items: itemsList,
     );
   }
 
