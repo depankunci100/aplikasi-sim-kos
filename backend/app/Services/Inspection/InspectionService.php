@@ -127,8 +127,8 @@ class InspectionService
     {
         $inspection = $item->inspection;
 
-        if (in_array($inspection->status, [InspectionStatus::APPROVED_BY_TENANT, InspectionStatus::CANCELLED])) {
-            throw new DomainException('Item inspeksi tidak dapat diubah karena inspeksi telah selesai atau dibatalkan.');
+        if (in_array($inspection->status, [InspectionStatus::COMPLETED, InspectionStatus::APPROVED_BY_TENANT, InspectionStatus::CANCELLED])) {
+            throw new DomainException('Item inspeksi tidak dapat diubah karena inspeksi telah selesai, disetujui, atau dibatalkan.');
         }
 
         $item->update([
@@ -148,6 +148,13 @@ class InspectionService
      */
     public function addMedia(Inspection $inspection, UploadedFile $file, ?int $itemId, ?string $caption, User $user): InspectionMedia
     {
+        if ($itemId !== null) {
+            $item = InspectionItem::where('inspection_id', $inspection->id)->find($itemId);
+            if (!$item) {
+                throw new DomainException('Item checklist tidak ditemukan pada inspeksi ini.');
+            }
+        }
+
         $path = $file->store("inspections/{$inspection->id}", 'local');
 
         $media = InspectionMedia::create([
@@ -191,23 +198,27 @@ class InspectionService
      */
     public function tenantApprove(Inspection $inspection, ?string $feedback, User $tenant): Inspection
     {
-        if ($inspection->tenant_id && $inspection->tenant_id !== $tenant->id) {
-            throw new DomainException('Anda tidak memiliki kewenangan untuk menyetujui inspeksi kamar ini.');
-        }
+        return DB::transaction(function () use ($inspection, $feedback, $tenant) {
+            $locked = Inspection::lockForUpdate()->findOrFail($inspection->id);
 
-        if ($inspection->status !== InspectionStatus::COMPLETED && $inspection->status !== InspectionStatus::OBJECTED_BY_TENANT) {
-            throw new DomainException("Hanya inspeksi berstatus selesai yang dapat disetujui.");
-        }
+            if (!$locked->tenant_id || $locked->tenant_id !== $tenant->id) {
+                throw new DomainException('Anda tidak memiliki kewenangan untuk menyetujui inspeksi kamar ini.');
+            }
 
-        $inspection->update([
-            'status' => InspectionStatus::APPROVED_BY_TENANT->value,
-            'tenant_feedback' => $feedback ?? 'Penyewa menyetujui kondisi kamar.',
-            'tenant_decision_at' => now(),
-        ]);
+            if ($locked->status !== InspectionStatus::COMPLETED && $locked->status !== InspectionStatus::OBJECTED_BY_TENANT) {
+                throw new DomainException("Hanya inspeksi berstatus selesai yang dapat disetujui.");
+            }
 
-        $this->logAction($inspection, $tenant, 'tenant_approved', 'Penyewa menyetujui hasil inspeksi kamar.');
+            $locked->update([
+                'status' => InspectionStatus::APPROVED_BY_TENANT->value,
+                'tenant_feedback' => $feedback ?? 'Penyewa menyetujui kondisi kamar.',
+                'tenant_decision_at' => now(),
+            ]);
 
-        return $inspection->fresh();
+            $this->logAction($locked, $tenant, 'tenant_approved', 'Penyewa menyetujui hasil inspeksi kamar.');
+
+            return $locked->fresh();
+        });
     }
 
     /**
@@ -215,23 +226,27 @@ class InspectionService
      */
     public function tenantObject(Inspection $inspection, string $objectionNotes, User $tenant): Inspection
     {
-        if ($inspection->tenant_id && $inspection->tenant_id !== $tenant->id) {
-            throw new DomainException('Anda tidak memiliki kewenangan untuk mengajukan keberatan pada inspeksi ini.');
-        }
+        return DB::transaction(function () use ($inspection, $objectionNotes, $tenant) {
+            $locked = Inspection::lockForUpdate()->findOrFail($inspection->id);
 
-        if ($inspection->status !== InspectionStatus::COMPLETED) {
-            throw new DomainException("Keberatan hanya dapat diajukan pada inspeksi yang telah diselesaikan petugas.");
-        }
+            if (!$locked->tenant_id || $locked->tenant_id !== $tenant->id) {
+                throw new DomainException('Anda tidak memiliki kewenangan untuk mengajukan keberatan pada inspeksi ini.');
+            }
 
-        $inspection->update([
-            'status' => InspectionStatus::OBJECTED_BY_TENANT->value,
-            'tenant_feedback' => $objectionNotes,
-            'tenant_decision_at' => now(),
-        ]);
+            if ($locked->status !== InspectionStatus::COMPLETED) {
+                throw new DomainException("Keberatan hanya dapat diajukan pada inspeksi yang telah diselesaikan petugas.");
+            }
 
-        $this->logAction($inspection, $tenant, 'tenant_objected', "Penyewa mengajukan keberatan: {$objectionNotes}");
+            $locked->update([
+                'status' => InspectionStatus::OBJECTED_BY_TENANT->value,
+                'tenant_feedback' => $objectionNotes,
+                'tenant_decision_at' => now(),
+            ]);
 
-        return $inspection->fresh();
+            $this->logAction($locked, $tenant, 'tenant_objected', "Penyewa mengajukan keberatan: {$objectionNotes}");
+
+            return $locked->fresh();
+        });
     }
 
     /**
@@ -239,6 +254,10 @@ class InspectionService
      */
     public function compareInspections(Inspection $current, Inspection $baseline): array
     {
+        if ($current->room_id !== $baseline->room_id || $current->property_id !== $baseline->property_id) {
+            throw new DomainException('Inspeksi baseline harus berasal dari kamar dan properti yang sama.');
+        }
+
         $currentItems = $current->items->keyBy('item_name');
         $baselineItems = $baseline->items->keyBy('item_name');
 
@@ -252,9 +271,15 @@ class InspectionService
             $currCond = $curr->condition->value;
 
             $isDegraded = $this->isConditionDegraded($baseCond, $currCond);
+            $isWearAndTear = ($baseCond === 'good' && $currCond === 'fair' && !$curr->repair_required);
 
             if ($isDegraded || $curr->repair_required || $curr->estimated_cost > 0) {
-                $totalEstimatedCost += (float)$curr->estimated_cost;
+                // Biaya hanya dikalkulasi jika ada perbaikan yang dibutuhkan atau kerusakan nyata (bukan sekadar pemakaian wajar)
+                $itemCost = ($curr->repair_required || in_array($currCond, ['poor', 'damaged', 'missing']))
+                    ? (float)$curr->estimated_cost
+                    : 0.00;
+
+                $totalEstimatedCost += $itemCost;
 
                 $differences[] = [
                     'item_name' => $name,
@@ -262,6 +287,7 @@ class InspectionService
                     'baseline_condition' => $baseCond,
                     'current_condition' => $currCond,
                     'is_degraded' => $isDegraded,
+                    'is_wear_and_tear' => $isWearAndTear,
                     'repair_required' => $curr->repair_required,
                     'estimated_cost' => (float)$curr->estimated_cost,
                     'notes' => $curr->notes,
@@ -285,6 +311,7 @@ class InspectionService
             'differences' => $differences,
             'total_damage_cost' => $totalEstimatedCost,
             'has_degradation' => !empty($differences),
+            'financial_notice' => 'Hasil perbandingan ini merupakan temuan estimasi teknis dan tidak otomatis memotong saldo deposit atau menerbitkan invoice tagihan.',
         ];
     }
 

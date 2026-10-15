@@ -211,7 +211,7 @@ class InspectionWebController extends Controller
         }
 
         $validated = $request->validate([
-            'photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'inspection_item_id' => ['nullable', 'exists:inspection_items,id'],
             'caption' => ['nullable', 'string', 'max:255'],
         ]);
@@ -249,10 +249,13 @@ class InspectionWebController extends Controller
         $fullPath = Storage::disk('local')->path($media->file_path);
         $mimeType = Storage::disk('local')->mimeType($media->file_path) ?? 'image/jpeg';
 
-        return response()->file($fullPath, [
+        $fileResponse = response()->file($fullPath, [
             'Content-Type' => $mimeType,
-            'Cache-Control' => 'no-cache, private',
         ]);
+        $fileResponse->setPrivate();
+        $fileResponse->headers->addCacheControlDirective('no-cache', true);
+
+        return $fileResponse;
     }
 
     public function complete(Request $request, int $id): RedirectResponse
@@ -282,6 +285,10 @@ class InspectionWebController extends Controller
         $user = Auth::user();
         $current = Inspection::with(['items', 'room.roomType', 'property'])->findOrFail($id);
 
+        if (!$this->inspectionService->canAccessInspection($current, $user)) {
+            abort(403, 'Akses inspeksi kamar ditolak.');
+        }
+
         $baselineId = $request->query('baseline_id', $current->baseline_inspection_id);
 
         $baseline = null;
@@ -290,6 +297,9 @@ class InspectionWebController extends Controller
         if ($baselineId) {
             $baseline = Inspection::with(['items', 'inspector'])->find($baselineId);
             if ($baseline) {
+                if (!$this->inspectionService->canAccessInspection($baseline, $user) || $baseline->room_id !== $current->room_id) {
+                    abort(403, 'Akses ke data baseline inspeksi ditolak atau kamar tidak sesuai.');
+                }
                 $comparison = $this->inspectionService->compareInspections($current, $baseline);
             }
         }

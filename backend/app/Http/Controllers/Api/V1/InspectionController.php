@@ -188,7 +188,7 @@ class InspectionController extends ApiController
         }
 
         $validated = $request->validate([
-            'photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'inspection_item_id' => ['nullable', 'exists:inspection_items,id'],
             'caption' => ['nullable', 'string', 'max:255'],
         ]);
@@ -229,10 +229,13 @@ class InspectionController extends ApiController
         $fullPath = Storage::disk('local')->path($media->file_path);
         $mimeType = Storage::disk('local')->mimeType($media->file_path) ?? 'image/jpeg';
 
-        return response()->file($fullPath, [
+        $fileResponse = response()->file($fullPath, [
             'Content-Type' => $mimeType,
-            'Cache-Control' => 'no-cache, private',
         ]);
+        $fileResponse->setPrivate();
+        $fileResponse->headers->addCacheControlDirective('no-cache', true);
+
+        return $fileResponse;
     }
 
     public function complete(Request $request, int $id): JsonResponse
@@ -325,8 +328,15 @@ class InspectionController extends ApiController
             return $this->errorResponse('Anda tidak memiliki izin membandingkan inspeksi ini.', 403);
         }
 
-        $comparison = $this->inspectionService->compareInspections($current, $baseline);
+        if ($current->room_id !== $baseline->room_id || $current->property_id !== $baseline->property_id) {
+            return $this->errorResponse('Inspeksi baseline harus berasal dari kamar dan properti yang sama.', 422);
+        }
 
-        return $this->successResponse($comparison, 'Hasil perbandingan kondisi kamar berhasil dikalkulasi.');
+        try {
+            $comparison = $this->inspectionService->compareInspections($current, $baseline);
+            return $this->successResponse($comparison, 'Hasil perbandingan kondisi kamar berhasil dikalkulasi.');
+        } catch (DomainException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
     }
 }
