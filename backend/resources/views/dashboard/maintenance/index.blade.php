@@ -14,11 +14,67 @@
     </a>
 </div>
 
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-light p-3 text-primary-teal">
+                    <i class="bi bi-tools fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Total Tiket</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['total'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-warning bg-opacity-10 p-3 text-warning">
+                    <i class="bi bi-gear-wide-connected fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Dikerjakan</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['in_progress'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-info bg-opacity-10 p-3 text-info">
+                    <i class="bi bi-patch-check fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Verifikasi</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['pending_verification'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-danger bg-opacity-10 p-3 text-danger">
+                    <i class="bi bi-alarm fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Terlambat (SLA)</div>
+                    <div class="fs-4 fw-bold text-danger">{{ $counts['overdue'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Filter Card -->
-<div class="card mb-4">
+<div class="card mb-4 border-0 shadow-sm">
     <div class="card-body">
         <form method="GET" action="{{ route('dashboard.maintenance.index') }}" class="row g-3 align-items-end">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small fw-semibold text-muted">Properti</label>
                 <select name="property_id" class="form-select form-select-sm">
                     <option value="">Semua Properti</option>
@@ -63,12 +119,25 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label small fw-semibold text-muted">Cari</label>
-                <input type="text" name="search" class="form-control form-control-sm" placeholder="No Tiket / Judul / Kamar" value="{{ $filters['search'] ?? '' }}">
+                <label class="form-label small fw-semibold text-muted">Tanggal Jadwal</label>
+                <input type="date" name="scheduled_date" class="form-control form-control-sm" value="{{ $filters['scheduled_date'] ?? '' }}">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-semibold text-muted">Overdue</label>
+                <select name="is_overdue" class="form-select form-select-sm">
+                    <option value="">Semua</option>
+                    <option value="1" {{ ($filters['is_overdue'] ?? '') === '1' ? 'selected' : '' }}>Ya</option>
+                </select>
             </div>
             <div class="col-md-1 d-flex gap-1">
                 <button type="submit" class="btn btn-primary-teal btn-sm w-100" title="Filter"><i class="bi bi-filter"></i></button>
                 <a href="{{ route('dashboard.maintenance.index') }}" class="btn btn-outline-secondary btn-sm" title="Reset"><i class="bi bi-arrow-counterclockwise"></i></a>
+            </div>
+            <div class="col-12 mt-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" placeholder="Cari berdasarkan No. Tiket, Judul Kerusakan, atau Nomor Kamar..." value="{{ $filters['search'] ?? '' }}">
+                </div>
             </div>
         </form>
     </div>

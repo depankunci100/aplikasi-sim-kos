@@ -157,6 +157,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const propertySelect = document.getElementById('propertySelect');
     const roomSelect = document.getElementById('roomSelect');
     const assigneeSelect = document.getElementById('assigneeSelect');
+    const selectedRoomId = '{{ old('room_id', '') }}';
+    const selectedAssigneeId = '{{ old('assigned_to', '') }}';
 
     function updateOptions() {
         const selected = propertySelect.options[propertySelect.selectedIndex];
@@ -170,6 +172,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const opt = document.createElement('option');
             opt.value = r.id;
             opt.textContent = `Kamar ${r.room_number} (${r.status})`;
+            if (selectedRoomId && r.id == selectedRoomId) {
+                opt.selected = true;
+            }
             roomSelect.appendChild(opt);
         });
 
@@ -178,6 +183,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const opt = document.createElement('option');
             opt.value = u.id;
             opt.textContent = `${u.name} (${u.pivot ? u.pivot.role : 'Staff'})`;
+            if (selectedAssigneeId && u.id == selectedAssigneeId) {
+                opt.selected = true;
+            }
             assigneeSelect.appendChild(opt);
         });
     }

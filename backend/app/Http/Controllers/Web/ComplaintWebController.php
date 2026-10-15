@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\Complaint;
 use App\Models\Property;
+use App\Models\User;
 use App\Services\Complaint\ComplaintService;
 use DomainException;
 use Illuminate\Http\Request;
@@ -19,22 +21,51 @@ class ComplaintWebController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $filters = $request->only(['property_id', 'room_id', 'category', 'priority', 'status', 'search']);
+        $filters = $request->only(['property_id', 'room_id', 'category', 'priority', 'status', 'date', 'search']);
 
         $complaints = $this->complaintService->getComplaintsQuery($user, $filters)->paginate(15);
-        $properties = $user->isSuperAdmin()
-            ? Property::active()->get()
-            : $user->properties()->active()->get();
 
-        return view('dashboard.complaints.index', compact('complaints', 'properties', 'filters'));
+        $counts = [
+            'total' => (clone $this->complaintService->getComplaintsQuery($user, []))->count(),
+            'submitted' => (clone $this->complaintService->getComplaintsQuery($user, ['status' => 'submitted']))->count(),
+            'in_progress' => (clone $this->complaintService->getComplaintsQuery($user, ['status' => 'in_progress']))->count(),
+            'resolved' => (clone $this->complaintService->getComplaintsQuery($user, ['status' => 'resolved']))->count(),
+        ];
+
+        if ($user->isSuperAdmin()) {
+            $properties = Property::active()->get();
+        } elseif ($user->isTenant()) {
+            $propertyIds = Booking::where('user_id', $user->id)
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                ->pluck('property_id');
+            $properties = Property::whereIn('id', $propertyIds)->active()->get();
+        } else {
+            $properties = $user->properties()->active()->get();
+        }
+
+        return view('dashboard.complaints.index', compact('complaints', 'properties', 'filters', 'counts'));
     }
 
     public function create(Request $request)
     {
         $user = $request->user();
-        $properties = $user->isSuperAdmin()
-            ? Property::with('rooms')->active()->get()
-            : $user->properties()->with('rooms')->active()->get();
+
+        if ($user->isSuperAdmin()) {
+            $properties = Property::with('rooms')->active()->get();
+        } elseif ($user->isTenant()) {
+            $bookingRooms = Booking::where('user_id', $user->id)
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                ->with('room')
+                ->get();
+            $propertyIds = $bookingRooms->pluck('property_id')->unique();
+            $roomIds = $bookingRooms->pluck('room_id')->filter();
+            $properties = Property::whereIn('id', $propertyIds)
+                ->with(['rooms' => fn ($q) => $q->whereIn('id', $roomIds)])
+                ->active()
+                ->get();
+        } else {
+            $properties = $user->properties()->with('rooms')->active()->get();
+        }
 
         return view('dashboard.complaints.create', compact('properties'));
     }
@@ -83,21 +114,14 @@ class ComplaintWebController extends Controller
             'comments.user',
         ])->findOrFail($id);
 
-        try {
-            if ($user->isTenant()) {
-                if ($user->id !== $complaint->user_id) {
-                    abort(403, 'Anda tidak berhak melihat keluhan ini.');
-                }
-            } else {
-                $this->complaintService->authorizePropertyAccess($user, $complaint->property_id);
-            }
-        } catch (DomainException $e) {
-            abort(403, $e->getMessage());
-        }
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $availableStaff = $complaint->property->users()
             ->whereIn('property_users.role', ['staff', 'manager', 'owner', 'receptionist'])
             ->get();
+        if ($availableStaff->isEmpty()) {
+            $availableStaff = $complaint->property->users;
+        }
 
         return view('dashboard.complaints.show', compact('complaint', 'availableStaff'));
     }
@@ -106,6 +130,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         try {
             $this->complaintService->acknowledgeComplaint($complaint, $user);
@@ -119,6 +144,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $request->validate([
             'assigned_to' => 'required|exists:users,id',
@@ -136,6 +162,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $request->validate([
             'comment' => 'required|string|max:1000',
@@ -163,6 +190,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $request->validate([
             'category' => 'nullable|in:electricity,water,plumbing,ac,furniture,door_lock,internet,cleanliness,other',
@@ -185,6 +213,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $request->validate([
             'resolution_notes' => 'required|string|min:3|max:500',
@@ -202,6 +231,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $request->validate([
             'action' => 'required|in:confirm,reopen',
@@ -234,6 +264,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $request->validate([
             'rejection_reason' => 'required|string|min:3|max:500',
@@ -251,6 +282,7 @@ class ComplaintWebController extends Controller
     {
         $user = $request->user();
         $complaint = Complaint::findOrFail($id);
+        $this->authorizeComplaintAccess($user, $complaint);
 
         $path = $request->query('path');
         if (empty($path)) {
@@ -264,6 +296,21 @@ class ComplaintWebController extends Controller
             ]);
         } catch (DomainException $e) {
             abort(403, $e->getMessage());
+        }
+    }
+
+    protected function authorizeComplaintAccess(User $user, Complaint $complaint): void
+    {
+        if ($user->isTenant()) {
+            if ($user->id !== $complaint->user_id) {
+                abort(403, 'Anda tidak berhak mengakses keluhan ini.');
+            }
+        } else {
+            try {
+                $this->complaintService->authorizePropertyAccess($user, $complaint->property_id);
+            } catch (DomainException $e) {
+                abort(403, $e->getMessage());
+            }
         }
     }
 }

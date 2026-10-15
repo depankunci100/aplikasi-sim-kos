@@ -14,8 +14,64 @@
     </a>
 </div>
 
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-light p-3 text-primary-teal">
+                    <i class="bi bi-chat-left-dots fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Total Keluhan</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['total'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-secondary bg-opacity-10 p-3 text-secondary">
+                    <i class="bi bi-inbox fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Belum Ditinjau</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['submitted'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-warning bg-opacity-10 p-3 text-warning">
+                    <i class="bi bi-hourglass-split fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Sedang Ditangani</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['in_progress'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-success bg-opacity-10 p-3 text-success">
+                    <i class="bi bi-check-circle fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Terselesaikan</div>
+                    <div class="fs-4 fw-bold text-success">{{ $counts['resolved'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Filter Card -->
-<div class="card mb-4">
+<div class="card mb-4 border-0 shadow-sm">
     <div class="card-body">
         <form method="GET" action="{{ route('dashboard.complaints.index') }}" class="row g-3 align-items-end">
             <div class="col-md-3">
@@ -63,12 +119,18 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label small fw-semibold text-muted">Cari</label>
-                <input type="text" name="search" class="form-control form-control-sm" placeholder="No Tiket / Pelapor / Judul" value="{{ $filters['search'] ?? '' }}">
+                <label class="form-label small fw-semibold text-muted">Tanggal</label>
+                <input type="date" name="date" class="form-control form-control-sm" value="{{ $filters['date'] ?? '' }}">
             </div>
             <div class="col-md-1 d-flex gap-1">
                 <button type="submit" class="btn btn-primary-teal btn-sm w-100" title="Filter"><i class="bi bi-filter"></i></button>
                 <a href="{{ route('dashboard.complaints.index') }}" class="btn btn-outline-secondary btn-sm" title="Reset"><i class="bi bi-arrow-counterclockwise"></i></a>
+            </div>
+            <div class="col-12 mt-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" placeholder="Cari berdasarkan No. Tiket, Nama Pelapor, Judul Keluhan, atau Nomor Kamar..." value="{{ $filters['search'] ?? '' }}">
+                </div>
             </div>
         </form>
     </div>

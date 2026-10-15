@@ -63,5 +63,16 @@ class User extends Authenticatable
     {
         return $this->role === Role::TENANT;
     }
+
+    public function properties(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Property::class, 'property_users')->withPivot('role')->withTimestamps();
+    }
+
+    public function hasRole(string ...$roles): bool
+    {
+        $currentRole = $this->role instanceof Role ? $this->role->value : (string) $this->role;
+        return in_array($currentRole, $roles, true);
+    }
 }
 

@@ -88,4 +88,9 @@ class Property extends Model
     {
         return $this->hasMany(HousekeepingTask::class);
     }
+
+    public function scopeActive($query)
+    {
+        return $query->where('properties.is_active', true);
+    }
 }

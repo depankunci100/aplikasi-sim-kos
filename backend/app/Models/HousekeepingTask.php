@@ -41,6 +41,7 @@ class HousekeepingTask extends Model
 
     protected $casts = [
         'type' => HousekeepingType::class,
+        'priority' => \App\Enums\MaintenancePriority::class,
         'status' => HousekeepingStatus::class,
         'scheduled_date' => 'date',
         'started_at' => 'datetime',

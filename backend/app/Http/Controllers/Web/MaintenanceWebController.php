@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\MaintenanceRequest;
 use App\Models\Property;
 use App\Models\User;
@@ -20,22 +21,54 @@ class MaintenanceWebController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $filters = $request->only(['property_id', 'room_id', 'category', 'priority', 'status', 'is_overdue', 'search']);
+        $filters = $request->only(['property_id', 'room_id', 'category', 'priority', 'status', 'is_overdue', 'scheduled_date', 'search']);
+
+        // Jalankan pengecekan overdue secara otomatis
+        $this->maintenanceService->flagOverdueTickets();
 
         $requests = $this->maintenanceService->getMaintenanceQuery($user, $filters)->paginate(15);
-        $properties = $user->isSuperAdmin()
-            ? Property::active()->get()
-            : $user->properties()->active()->get();
 
-        return view('dashboard.maintenance.index', compact('requests', 'properties', 'filters'));
+        $counts = [
+            'total' => (clone $this->maintenanceService->getMaintenanceQuery($user, []))->count(),
+            'in_progress' => (clone $this->maintenanceService->getMaintenanceQuery($user, ['status' => 'in_progress']))->count(),
+            'pending_verification' => (clone $this->maintenanceService->getMaintenanceQuery($user, ['status' => 'pending_verification']))->count(),
+            'overdue' => (clone $this->maintenanceService->getMaintenanceQuery($user, ['is_overdue' => 1]))->count(),
+        ];
+
+        if ($user->isSuperAdmin()) {
+            $properties = Property::active()->get();
+        } elseif ($user->isTenant()) {
+            $propertyIds = Booking::where('user_id', $user->id)
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                ->pluck('property_id');
+            $properties = Property::whereIn('id', $propertyIds)->active()->get();
+        } else {
+            $properties = $user->properties()->active()->get();
+        }
+
+        return view('dashboard.maintenance.index', compact('requests', 'properties', 'filters', 'counts'));
     }
 
     public function create(Request $request)
     {
         $user = $request->user();
-        $properties = $user->isSuperAdmin()
-            ? Property::with('rooms')->active()->get()
-            : $user->properties()->with('rooms')->active()->get();
+
+        if ($user->isSuperAdmin()) {
+            $properties = Property::with('rooms')->active()->get();
+        } elseif ($user->isTenant()) {
+            $bookingRooms = Booking::where('user_id', $user->id)
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                ->with('room')
+                ->get();
+            $propertyIds = $bookingRooms->pluck('property_id')->unique();
+            $roomIds = $bookingRooms->pluck('room_id')->filter();
+            $properties = Property::whereIn('id', $propertyIds)
+                ->with(['rooms' => fn ($q) => $q->whereIn('id', $roomIds)])
+                ->active()
+                ->get();
+        } else {
+            $properties = $user->properties()->with('rooms')->active()->get();
+        }
 
         return view('dashboard.maintenance.create', compact('properties'));
     }
@@ -84,28 +117,14 @@ class MaintenanceWebController extends Controller
             'logs.user',
         ])->findOrFail($id);
 
-        try {
-            if ($user->isTenant()) {
-                if ($user->id !== $maintenance->reporter_id && $maintenance->room_id) {
-                    $isRoomRented = \App\Models\Booking::where('user_id', $user->id)
-                        ->where('room_id', $maintenance->room_id)
-                        ->whereIn('status', ['confirmed', 'checked_in'])
-                        ->exists();
-
-                    if (!$isRoomRented) {
-                        abort(403, 'Anda tidak berhak melihat tiket perbaikan ini.');
-                    }
-                }
-            } else {
-                $this->maintenanceService->authorizePropertyAccess($user, $maintenance->property_id);
-            }
-        } catch (DomainException $e) {
-            abort(403, $e->getMessage());
-        }
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         $availableStaff = $maintenance->property->users()
             ->whereIn('property_users.role', ['staff', 'manager', 'owner'])
             ->get();
+        if ($availableStaff->isEmpty()) {
+            $availableStaff = $maintenance->property->users;
+        }
 
         return view('dashboard.maintenance.show', compact('maintenance', 'availableStaff'));
     }
@@ -114,6 +133,7 @@ class MaintenanceWebController extends Controller
     {
         $user = $request->user();
         $maintenance = MaintenanceRequest::findOrFail($id);
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         $request->validate([
             'category' => 'nullable|in:electricity,water,plumbing,ac,furniture,door_lock,internet,cleanliness,other',
@@ -134,6 +154,7 @@ class MaintenanceWebController extends Controller
     {
         $user = $request->user();
         $maintenance = MaintenanceRequest::findOrFail($id);
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         $request->validate([
             'assigned_to' => 'required|exists:users,id',
@@ -158,6 +179,7 @@ class MaintenanceWebController extends Controller
     {
         $user = $request->user();
         $maintenance = MaintenanceRequest::findOrFail($id);
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         try {
             $this->maintenanceService->startMaintenance($maintenance, $request->diagnosis_notes, $user);
@@ -171,6 +193,7 @@ class MaintenanceWebController extends Controller
     {
         $user = $request->user();
         $maintenance = MaintenanceRequest::findOrFail($id);
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         $request->validate([
             'action_taken' => 'required|string',
@@ -200,6 +223,7 @@ class MaintenanceWebController extends Controller
     {
         $user = $request->user();
         $maintenance = MaintenanceRequest::findOrFail($id);
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         $request->validate([
             'verification_notes' => 'required|string|min:3|max:500',
@@ -222,6 +246,7 @@ class MaintenanceWebController extends Controller
     {
         $user = $request->user();
         $maintenance = MaintenanceRequest::findOrFail($id);
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         $request->validate([
             'action' => 'required|in:reject,cancel',
@@ -247,6 +272,7 @@ class MaintenanceWebController extends Controller
     {
         $user = $request->user();
         $maintenance = MaintenanceRequest::findOrFail($id);
+        $this->authorizeMaintenanceAccess($user, $maintenance);
 
         $path = $request->query('path');
         if (empty($path)) {
@@ -260,6 +286,39 @@ class MaintenanceWebController extends Controller
             ]);
         } catch (DomainException $e) {
             abort(403, $e->getMessage());
+        }
+    }
+
+    protected function authorizeMaintenanceAccess(User $user, MaintenanceRequest $maintenance): void
+    {
+        if ($user->isTenant()) {
+            if ($user->id !== $maintenance->reporter_id) {
+                $hasActiveRentalInProperty = Booking::where('user_id', $user->id)
+                    ->where('property_id', $maintenance->property_id)
+                    ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                    ->exists();
+
+                if (!$hasActiveRentalInProperty) {
+                    abort(403, 'Anda tidak berhak mengakses tiket perbaikan ini.');
+                }
+
+                if ($maintenance->room_id) {
+                    $isRoomRented = Booking::where('user_id', $user->id)
+                        ->where('room_id', $maintenance->room_id)
+                        ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                        ->exists();
+
+                    if (!$isRoomRented) {
+                        abort(403, 'Anda tidak berhak mengakses tiket perbaikan kamar milik orang lain.');
+                    }
+                }
+            }
+        } else {
+            try {
+                $this->maintenanceService->authorizePropertyAccess($user, $maintenance->property_id);
+            } catch (DomainException $e) {
+                abort(403, $e->getMessage());
+            }
         }
     }
 }

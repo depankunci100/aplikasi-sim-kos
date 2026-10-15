@@ -81,7 +81,7 @@ class MaintenanceService
         if ($user->isTenant()) {
             // Penyewa hanya melihat tiket yang ia laporkan atau terkait kamar aktifnya
             $userBookingRooms = Booking::where('user_id', $user->id)
-                ->whereIn('status', ['confirmed', 'checked_in'])
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                 ->pluck('room_id')
                 ->filter();
 
@@ -129,6 +129,10 @@ class MaintenanceService
             $query->where('assigned_to', $filters['assigned_to']);
         }
 
+        if (!empty($filters['scheduled_date'])) {
+            $query->whereDate('scheduled_date', $filters['scheduled_date']);
+        }
+
         if (!empty($filters['search'])) {
             $term = trim($filters['search']);
             $query->where(function ($sub) use ($term) {
@@ -153,7 +157,7 @@ class MaintenanceService
             // Penyewa wajib memvalidasi apakah kamar atau properti terkait booking aktifnya
             $hasActiveBooking = Booking::where('user_id', $actor->id)
                 ->where('property_id', $propertyId)
-                ->whereIn('status', ['confirmed', 'checked_in'])
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                 ->exists();
 
             if (!$hasActiveBooking) {
@@ -163,7 +167,7 @@ class MaintenanceService
             if (!empty($data['room_id'])) {
                 $isRoomRented = Booking::where('user_id', $actor->id)
                     ->where('room_id', $data['room_id'])
-                    ->whereIn('status', ['confirmed', 'checked_in'])
+                    ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                     ->exists();
 
                 if (!$isRoomRented) {
@@ -275,8 +279,8 @@ class MaintenanceService
      */
     public function triageMaintenance(MaintenanceRequest $maintenance, array $data, User $actor): MaintenanceRequest
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak memiliki izin melakukan triase tiket perbaikan.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak memiliki izin melakukan triase tiket perbaikan.');
         }
 
         $this->authorizePropertyAccess($actor, $maintenance->property_id);
@@ -326,8 +330,8 @@ class MaintenanceService
      */
     public function assignMaintenance(MaintenanceRequest $maintenance, int $assigneeId, ?string $scheduledDate, User $actor): MaintenanceRequest
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak dapat menugaskan teknisi.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak dapat menugaskan teknisi.');
         }
 
         $this->authorizePropertyAccess($actor, $maintenance->property_id);
@@ -386,8 +390,8 @@ class MaintenanceService
      */
     public function startMaintenance(MaintenanceRequest $maintenance, ?string $diagnosisNotes, User $actor): MaintenanceRequest
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak memiliki izin mengubah status pengerjaan.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak memiliki izin mengubah status pengerjaan.');
         }
 
         $this->authorizePropertyAccess($actor, $maintenance->property_id);
@@ -435,8 +439,8 @@ class MaintenanceService
         ?array $afterPhotos,
         User $actor
     ): MaintenanceRequest {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak dapat menyerahkan hasil perbaikan.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak dapat menyerahkan hasil perbaikan.');
         }
 
         $this->authorizePropertyAccess($actor, $maintenance->property_id);
@@ -644,7 +648,7 @@ class MaintenanceService
             if (!$isAuthorized && $maintenance->room_id) {
                 $isAuthorized = Booking::where('user_id', $user->id)
                     ->where('room_id', $maintenance->room_id)
-                    ->whereIn('status', ['confirmed', 'checked_in'])
+                    ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                     ->exists();
             }
             if (!$isAuthorized) {

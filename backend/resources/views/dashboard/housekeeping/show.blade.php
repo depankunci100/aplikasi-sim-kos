@@ -148,7 +148,7 @@
             <div class="card-body">
                 @if($task->status->value === 'in_progress' && ($task->assigned_to === auth()->id() || auth()->user()->isSuperAdmin() || auth()->user()->hasRole('manager') || auth()->user()->hasRole('owner') || auth()->user()->hasRole('staff')))
                 <!-- Form Submit Verification saat In Progress -->
-                <form action="{{ route('dashboard.housekeeping.submitVerification', $task->id) }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ route('dashboard.housekeeping.submit-verification', $task->id) }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="list-group mb-4">
                         @foreach($checklist as $item)

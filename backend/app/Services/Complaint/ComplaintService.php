@@ -110,6 +110,10 @@ class ComplaintService
             $query->where('status', $filters['status']);
         }
 
+        if (!empty($filters['date'])) {
+            $query->whereDate('created_at', $filters['date']);
+        }
+
         if (!empty($filters['search'])) {
             $term = trim($filters['search']);
             $query->where(function ($sub) use ($term) {
@@ -134,7 +138,7 @@ class ComplaintService
             // Pastikan properti disewa oleh penyewa
             $hasActiveBooking = Booking::where('user_id', $actor->id)
                 ->where('property_id', $propertyId)
-                ->whereIn('status', ['confirmed', 'checked_in'])
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                 ->exists();
 
             if (!$hasActiveBooking) {
@@ -145,7 +149,7 @@ class ComplaintService
             if (!empty($data['room_id'])) {
                 $isRoomRented = Booking::where('user_id', $actor->id)
                     ->where('room_id', $data['room_id'])
-                    ->whereIn('status', ['confirmed', 'checked_in'])
+                    ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                     ->exists();
 
                 if (!$isRoomRented) {

@@ -74,7 +74,7 @@ class HousekeepingService
         if ($user->isTenant()) {
             // Penyewa hanya melihat jadwal kebersihan kamar miliknya
             $activeRoomIds = Booking::where('user_id', $user->id)
-                ->whereIn('status', ['confirmed', 'checked_in'])
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                 ->pluck('room_id')
                 ->filter();
 
@@ -114,6 +114,16 @@ class HousekeepingService
             $query->where('assigned_to', $filters['assigned_to']);
         }
 
+        if (!empty($filters['search'])) {
+            $term = trim($filters['search']);
+            $query->where(function ($sub) use ($term) {
+                $sub->where('task_number', 'like', "%{$term}%")
+                    ->orWhere('area_name', 'like', "%{$term}%")
+                    ->orWhereHas('room', fn ($r) => $r->where('room_number', 'like', "%{$term}%"))
+                    ->orWhereHas('assignee', fn ($u) => $u->where('name', 'like', "%{$term}%"));
+            });
+        }
+
         return $query;
     }
 
@@ -122,8 +132,8 @@ class HousekeepingService
      */
     public function createTask(array $data, User $actor): HousekeepingTask
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak dapat membuat jadwal tugas housekeeping.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak dapat membuat jadwal tugas housekeeping.');
         }
 
         $propertyId = (int) $data['property_id'];
@@ -228,8 +238,8 @@ class HousekeepingService
      */
     public function assignTask(HousekeepingTask $task, int $staffId, User $actor): HousekeepingTask
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak dapat menugaskan staf housekeeping.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak dapat menugaskan staf housekeeping.');
         }
 
         $this->authorizePropertyAccess($actor, $task->property_id);
@@ -285,8 +295,8 @@ class HousekeepingService
      */
     public function startTask(HousekeepingTask $task, ?array $beforePhotos, User $actor): HousekeepingTask
     {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak dapat memulai tugas housekeeping.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak dapat memulai tugas housekeeping.');
         }
 
         $this->authorizePropertyAccess($actor, $task->property_id);
@@ -344,8 +354,8 @@ class HousekeepingService
         ?string $notes,
         User $actor
     ): HousekeepingTask {
-        if ($actor->isTenant()) {
-            throw new DomainException('Penyewa tidak dapat menyerahkan tugas housekeeping.');
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Kasir atau penyewa tidak dapat menyerahkan tugas housekeeping.');
         }
 
         $this->authorizePropertyAccess($actor, $task->property_id);
@@ -423,7 +433,7 @@ class HousekeepingService
         string $verificationNotes,
         User $actor
     ): HousekeepingTask {
-        if ($actor->isTenant() || $actor->isStaff()) {
+        if ($actor->isTenant() || $actor->isStaff() || $actor->isCashier()) {
             throw new DomainException('Hanya Pemilik, Manajer, atau Supervisor yang berwenang memverifikasi tugas kebersihan.');
         }
 
@@ -506,7 +516,7 @@ class HousekeepingService
             if ($task->room_id) {
                 $isRoomRented = Booking::where('user_id', $user->id)
                     ->where('room_id', $task->room_id)
-                    ->whereIn('status', ['confirmed', 'checked_in'])
+                    ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                     ->exists();
             }
             if (!$isRoomRented) {

@@ -108,12 +108,16 @@
 
             if (!selectedOpt || !selectedOpt.dataset.rooms) return;
 
+            const oldRoomId = "{{ old('room_id') }}";
             try {
                 const rooms = JSON.parse(selectedOpt.dataset.rooms);
                 rooms.forEach(r => {
                     const opt = document.createElement('option');
                     opt.value = r.id;
                     opt.textContent = `Kamar ${r.room_number}`;
+                    if (oldRoomId && String(r.id) === String(oldRoomId)) {
+                        opt.selected = true;
+                    }
                     roomSelect.appendChild(opt);
                 });
             } catch (e) {}

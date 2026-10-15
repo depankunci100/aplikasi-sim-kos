@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\HousekeepingTask;
 use App\Models\Property;
+use App\Models\User;
 use App\Services\Housekeeping\HousekeepingService;
 use DomainException;
 use Illuminate\Http\Request;
@@ -19,19 +21,41 @@ class HousekeepingWebController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $filters = $request->only(['property_id', 'room_id', 'status', 'type', 'scheduled_date', 'assigned_to']);
+        $filters = $request->only(['property_id', 'room_id', 'status', 'type', 'scheduled_date', 'assigned_to', 'search']);
 
         $tasks = $this->housekeepingService->getTasksQuery($user, $filters)->paginate(15);
-        $properties = $user->isSuperAdmin()
-            ? Property::active()->get()
-            : $user->properties()->active()->get();
 
-        return view('dashboard.housekeeping.index', compact('tasks', 'properties', 'filters'));
+        $counts = [
+            'total' => (clone $this->housekeepingService->getTasksQuery($user, []))->count(),
+            'scheduled' => (clone $this->housekeepingService->getTasksQuery($user, ['status' => 'scheduled']))->count(),
+            'in_progress' => (clone $this->housekeepingService->getTasksQuery($user, ['status' => 'in_progress']))->count(),
+            'pending_verification' => (clone $this->housekeepingService->getTasksQuery($user, ['status' => 'pending_verification']))->count(),
+            'completed' => (clone $this->housekeepingService->getTasksQuery($user, ['status' => 'completed']))->count(),
+        ];
+
+        if ($user->isSuperAdmin()) {
+            $properties = Property::active()->get();
+        } elseif ($user->isTenant()) {
+            $propertyIds = Booking::where('user_id', $user->id)
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                ->pluck('property_id');
+            $properties = Property::whereIn('id', $propertyIds)->active()->get();
+        } else {
+            $properties = $user->properties()->active()->get();
+        }
+
+        return view('dashboard.housekeeping.index', compact('tasks', 'properties', 'filters', 'counts'));
     }
 
     public function create(Request $request)
     {
         $user = $request->user();
+
+        if ($user->isTenant() || $user->isCashier()) {
+            return redirect()->route('dashboard.housekeeping.index')
+                ->with('error', 'Penyewa atau kasir tidak memiliki izin untuk menjadwalkan tugas kebersihan.');
+        }
+
         $properties = $user->isSuperAdmin()
             ? Property::with('rooms', 'users')->active()->get()
             : $user->properties()->with('rooms', 'users')->active()->get();
@@ -76,28 +100,14 @@ class HousekeepingWebController extends Controller
             'logs.user',
         ])->findOrFail($id);
 
-        try {
-            if ($user->isTenant()) {
-                $isRoomRented = false;
-                if ($task->room_id) {
-                    $isRoomRented = \App\Models\Booking::where('user_id', $user->id)
-                        ->where('room_id', $task->room_id)
-                        ->whereIn('status', ['confirmed', 'checked_in'])
-                        ->exists();
-                }
-                if (!$isRoomRented) {
-                    abort(403, 'Anda tidak berhak melihat tugas kebersihan ini.');
-                }
-            } else {
-                $this->housekeepingService->authorizePropertyAccess($user, $task->property_id);
-            }
-        } catch (DomainException $e) {
-            abort(403, $e->getMessage());
-        }
+        $this->authorizeHousekeepingAccess($user, $task);
 
         $availableStaff = $task->property->users()
             ->whereIn('property_users.role', ['staff', 'manager', 'owner'])
             ->get();
+        if ($availableStaff->isEmpty()) {
+            $availableStaff = $task->property->users;
+        }
 
         return view('dashboard.housekeeping.show', compact('task', 'availableStaff'));
     }
@@ -106,6 +116,7 @@ class HousekeepingWebController extends Controller
     {
         $user = $request->user();
         $task = HousekeepingTask::findOrFail($id);
+        $this->authorizeHousekeepingAccess($user, $task);
 
         $request->validate([
             'assigned_to' => 'required|exists:users,id',
@@ -123,6 +134,7 @@ class HousekeepingWebController extends Controller
     {
         $user = $request->user();
         $task = HousekeepingTask::findOrFail($id);
+        $this->authorizeHousekeepingAccess($user, $task);
 
         $request->validate([
             'photos_before' => 'nullable|array',
@@ -141,6 +153,7 @@ class HousekeepingWebController extends Controller
     {
         $user = $request->user();
         $task = HousekeepingTask::findOrFail($id);
+        $this->authorizeHousekeepingAccess($user, $task);
 
         $request->validate([
             'checklist_done' => 'nullable|array',
@@ -152,10 +165,10 @@ class HousekeepingWebController extends Controller
 
         // Buat struktur checklist yang diperbarui
         $updatedChecklist = [];
-        $doneIds = $request->input('checklist_done', []);
+        $doneIds = array_map('strval', $request->input('checklist_done', []));
         foreach ($task->checklist ?? [] as $item) {
             $itemId = (string) ($item['id'] ?? '');
-            $item['is_done'] = in_array($itemId, $doneIds);
+            $item['is_done'] = in_array($itemId, $doneIds, true);
             $updatedChecklist[] = $item;
         }
 
@@ -179,6 +192,7 @@ class HousekeepingWebController extends Controller
     {
         $user = $request->user();
         $task = HousekeepingTask::findOrFail($id);
+        $this->authorizeHousekeepingAccess($user, $task);
 
         $request->validate([
             'verification_notes' => 'required|string|min:3|max:500',
@@ -196,6 +210,7 @@ class HousekeepingWebController extends Controller
     {
         $user = $request->user();
         $task = HousekeepingTask::findOrFail($id);
+        $this->authorizeHousekeepingAccess($user, $task);
 
         $request->validate([
             'reason' => 'required|string|min:3|max:500',
@@ -213,6 +228,7 @@ class HousekeepingWebController extends Controller
     {
         $user = $request->user();
         $task = HousekeepingTask::findOrFail($id);
+        $this->authorizeHousekeepingAccess($user, $task);
 
         $path = $request->query('path');
         if (empty($path)) {
@@ -226,6 +242,28 @@ class HousekeepingWebController extends Controller
             ]);
         } catch (DomainException $e) {
             abort(403, $e->getMessage());
+        }
+    }
+
+    protected function authorizeHousekeepingAccess(User $user, HousekeepingTask $task): void
+    {
+        if ($user->isTenant()) {
+            $isRoomRented = false;
+            if ($task->room_id) {
+                $isRoomRented = Booking::where('user_id', $user->id)
+                    ->where('room_id', $task->room_id)
+                    ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                    ->exists();
+            }
+            if (!$isRoomRented) {
+                abort(403, 'Anda tidak berhak mengakses tugas kebersihan ini.');
+            }
+        } else {
+            try {
+                $this->housekeepingService->authorizePropertyAccess($user, $task->property_id);
+            } catch (DomainException $e) {
+                abort(403, $e->getMessage());
+            }
         }
     }
 }

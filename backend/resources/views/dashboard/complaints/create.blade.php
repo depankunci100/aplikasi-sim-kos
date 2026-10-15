@@ -99,6 +99,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const propSelect = document.getElementById('propertySelect');
         const roomSelect = document.getElementById('roomSelect');
+        const selectedRoomId = '{{ old('room_id', '') }}';
 
         function updateRooms() {
             const selectedOpt = propSelect.options[propSelect.selectedIndex];
@@ -112,6 +113,9 @@
                     const opt = document.createElement('option');
                     opt.value = r.id;
                     opt.textContent = `Kamar ${r.room_number}`;
+                    if (selectedRoomId && r.id == selectedRoomId) {
+                        opt.selected = true;
+                    }
                     roomSelect.appendChild(opt);
                 });
             } catch (e) {}

@@ -16,11 +16,71 @@
     @endif
 </div>
 
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-light p-3 text-primary-teal">
+                    <i class="bi bi-stars fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Total Tugas</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['total'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary bg-opacity-10 p-3 text-primary">
+                    <i class="bi bi-calendar-event fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Dijadwalkan</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['scheduled'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-warning bg-opacity-10 p-3 text-warning">
+                    <i class="bi bi-hourglass-split fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Dikerjakan</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['in_progress'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm kpi-card">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-info bg-opacity-10 p-3 text-info">
+                    <i class="bi bi-patch-check fs-4"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">Verifikasi</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $counts['pending_verification'] ?? 0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Filter Card -->
 <div class="card mb-4 shadow-sm border-0">
     <div class="card-body">
         <form method="GET" action="{{ route('dashboard.housekeeping.index') }}" class="row g-3 align-items-end">
-            <div class="col-md-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold text-muted">Cari</label>
+                <input type="text" name="search" class="form-control form-control-sm" placeholder="No. tugas atau area..." value="{{ $filters['search'] ?? '' }}">
+            </div>
+            <div class="col-md-4">
                 <label class="form-label small fw-semibold text-muted">Properti</label>
                 <select name="property_id" class="form-select form-select-sm">
                     <option value="">Semua Properti</option>
@@ -31,7 +91,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-4">
                 <label class="form-label small fw-semibold text-muted">Tipe Tugas</label>
                 <select name="type" class="form-select form-select-sm">
                     <option value="">Semua Tipe</option>
@@ -42,7 +102,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-4">
                 <label class="form-label small fw-semibold text-muted">Status</label>
                 <select name="status" class="form-select form-select-sm">
                     <option value="">Semua Status</option>
@@ -53,13 +113,13 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label small fw-semibold text-muted">Tanggal Jadwal</label>
                 <input type="date" name="scheduled_date" class="form-control form-control-sm" value="{{ $filters['scheduled_date'] ?? '' }}">
             </div>
-            <div class="col-md-2 d-flex gap-1">
-                <button type="submit" class="btn btn-primary-teal btn-sm flex-grow-1" title="Filter"><i class="bi bi-filter me-1"></i>Filter</button>
-                <a href="{{ route('dashboard.housekeeping.index') }}" class="btn btn-outline-secondary btn-sm" title="Reset"><i class="bi bi-arrow-counterclockwise"></i></a>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary-teal btn-sm flex-grow-1" title="Filter"><i class="bi bi-filter me-1"></i>Terapkan Filter</button>
+                <a href="{{ route('dashboard.housekeeping.index') }}" class="btn btn-outline-secondary btn-sm" title="Reset"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</a>
             </div>
         </form>
     </div>
