@@ -48,6 +48,10 @@ Keterangan:
 | **Inspeksi & Checklist Kamar** | CRUD | CRUD (Miliknya) | CRUD (Cabang) | R (Operasional) | CRU (Pelaksana) | RU (Setujui / Keberatan) |
 | **Pengumuman Kos** | CRUD | CRUD | CRUD | R | R | R |
 | **Laporan Finansial & Okupansi** | CRUD | R (Lengkap) | R (Cabang) | R (Shift kasir)| - | - |
+| **Tiket Maintenance & Perbaikan** | CRUD | CRUD (Cabang)| CRUD (Cabang)| R (Status ringkas)| Pengerjaan & Verifikasi (Cabang) | C, R (Kamar sendiri) |
+| **Keluhan Penyewa (Complaints)** | CRUD | CRUD (Cabang)| CRUD (Cabang)| Triase & Respon (Cabang)| Respon Teknis (Cabang) | C, R, Balas, Tutup/Reopen (Milik sendiri) |
+| **Catatan Internal Keluhan (Internal Notes)** | CRUD | CRUD | CRUD | CRUD | CRUD | Tersembunyi (Disaring Server) |
+| **Tugas Housekeeping & Checklist** | CRUD | CRUD (Cabang)| CRUD (Cabang)| R (Status kamar)| Pelaksanaan Checklist (Cabang) | R (Kamar sendiri jika sedang disewa) |
 
 ---
 
@@ -76,4 +80,18 @@ Keterangan:
    - **Staff**: Berwenang mencatat nilai meter fisik lapangan (`record`) dan mengunggah foto bukti display. Staf tidak memiliki hak administratif untuk menetapkan tarif atau menerbitkan invoice finansial.
    - **Tenant / Penyewa**: Hanya berhak melihat riwayat pemakaian dan rincian tarif untuk kamar miliknya sendiri (`tenant_consumption`). Penyewa *tidak dapat* mengubah pembacaan meter resmi atau memanipulasi jumlah tagihan final.
 8. **Audit Trail Mutlak**:
-   Aksi kritis seperti verifikasi pembayaran (`verified_by`, `verified_at`), penolakan bukti (`rejection_reason`), pembatalan booking, perubahan harga kamar, inspeksi (`inspection_logs`), serta seluruh mutasi pembacaan, koreksi, dan penagihan utilitas (`utility_reading_logs`) dicatat secara permanen dengan `user_id`, aksi, data sebelum/sesudah, dan cap waktu.
+   Aksi kritis seperti verifikasi pembayaran (`verified_by`, `verified_at`), penolakan bukti (`rejection_reason`), pembatalan booking, perubahan harga kamar, inspeksi (`inspection_logs`), mutasi pembacaan utilitas (`utility_reading_logs`), tiket perbaikan (`maintenance_logs`), siklus keluhan (`complaint_logs`), dan aktivitas kebersihan (`housekeeping_logs`) dicatat secara permanen dengan `user_id`, aksi, data sebelum/sesudah, dan cap waktu.
+9. **Otorisasi & Batasan Modul Phase 5 (Maintenance, Complaints & Housekeeping)**:
+   - **Maintenance Management**:
+     - *Tenant*: Hanya dapat membuat tiket dan mengunggah foto awal (`photos_before`) untuk kamar yang sedang disewa aktif. Tidak dapat mengubah prioritas, menugaskan teknisi, atau memverifikasi pekerjaan sendiri.
+     - *Staff / Teknisi*: Berwenang memulai pengerjaan (`start`), mendokumentasikan diagnosis, tindakan perbaikan, suku cadang, biaya tenaga kerja/material, dan menyerahkan hasil verifikasi (`submit-verification`).
+     - *Manager / Owner / Super Admin*: Berwenang melakukan triase prioritas/SLA, menugaskan teknisi, menolak/membatalkan tiket dengan alasan, dan memverifikasi kelayakan hasil perbaikan (`verify`).
+     - *Receptionist / Kasir*: Dapat melihat ringkasan tiket untuk operasional tamu, namun dilarang melakukan pekerjaan teknis perbaikan atau memanipulasi biaya tanpa hak kelola.
+   - **Tenant Complaints**:
+     - *Tenant*: Mengajukan keluhan kamar/fasilitas/layanan/tagihan, melihat riwayat komentar publik miliknya sendiri, memberikan konfirmasi selesai (`confirm`) dengan rating kepuasan (1–5 bintang), atau membuka kembali keluhan (`reopen`) dengan alasan wajib.
+     - *Staf / Manager*: Berwenang menerima/mengakui keluhan (`acknowledge`), menetapkan penanggung jawab (`assign`), memberikan tanggapan publik kepada penyewa, serta membuat catatan koordinasi internal (`is_internal = true`) yang secara otomatis disaring oleh server dari pandangan tenant.
+     - *Larangan Mutasi Finansial Otomatis*: Keluhan berlabel `billing` tidak boleh dan tidak dapat memodifikasi invoice atau pembayaran secara otomatis.
+   - **Housekeeping Management**:
+     - *Manager / Owner*: Menjadwalkan tugas kebersihan kamar/area umum, menugaskan staf, membatalkan tugas terjadwal, dan melakukan evaluasi/verifikasi penyelesaian tugas.
+     - *Staff Kebersihan*: Melihat tugas yang ditugaskan, memulai pembersihan (`start`), mencentang checklist interaktif, mengunggah foto before/after, serta melaporkan temuan barang rusak atau hilang (`damaged_or_missing_items`).
+     - *Non-Alteration of Room Lifecycle*: Housekeeping tidak memiliki wewenang untuk mengubah status booking, check-in/out tamu, atau mendeklarasikan ketersediaan kamar di luar workflow sewa resmi.

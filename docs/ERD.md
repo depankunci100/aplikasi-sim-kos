@@ -415,20 +415,117 @@ erDiagram
   - `INDEX (invoice_id, item_type)`
   - `FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE`
 
+### Tabel: `maintenance_requests` (Phase 5)
+- **Fungsi**: Pengelolaan tiket pekerjaan perbaikan fasilitas, kerusakan kamar, dan area umum dengan siklus SLA, penugasan teknisi, diagnosis, rincian biaya, dan verifikasi supervisor.
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `UNIQUE (ticket_number)`
+  - `INDEX (property_id, status)`
+  - `INDEX (room_id, status)`
+  - `INDEX (reporter_id)`
+  - `INDEX (assigned_to)`
+  - `INDEX (is_overdue)`
+  - `INDEX (sla_due_at)`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (room_asset_id) REFERENCES room_assets(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `maintenance_logs` (Phase 5)
+- **Fungsi**: Audit trail permanen terhadap setiap perubahan status, triase prioritas, penugasan, pengerjaan, dan verifikasi tiket maintenance.
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (maintenance_request_id, created_at)`
+  - `FOREIGN KEY (maintenance_request_id) REFERENCES maintenance_requests(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `complaints` (Diperluas Phase 5)
+- **Fungsi**: Penanganan keluhan penyewa ber-tiket unik (`CMP-YYYYMMDD-XXXXX`) terkait kamar, fasilitas, layanan, tagihan, atau lingkungan, dengan alur triase, penanggung jawab, waktu respons pertama, penyelesaian, konfirmasi penyewa (bintang 1-5), dan pembukaan kembali (`reopened`).
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `UNIQUE (ticket_number)`
+  - `INDEX (property_id, status)`
+  - `INDEX (user_id)`
+  - `INDEX (assigned_to)`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (closed_by) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (maintenance_request_id) REFERENCES maintenance_requests(id) ON DELETE SET NULL`
+
+### Tabel: `complaint_comments` (Phase 5)
+- **Fungsi**: Thread percakapan dan tanggapan beruntun antara staf dan penyewa, mendukung penanda catatan internal (`is_internal = true`) yang disaring ketat dari pandangan penyewa.
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (complaint_id, created_at)`
+  - `INDEX (is_internal)`
+  - `FOREIGN KEY (complaint_id) REFERENCES complaints(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`
+
+### Tabel: `complaint_logs` (Phase 5)
+- **Fungsi**: Riwayat jejak audit siklus hidup keluhan (submitted, acknowledged, assigned, resolved, closed, reopened, rejected).
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (complaint_id, created_at)`
+  - `FOREIGN KEY (complaint_id) REFERENCES complaints(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `housekeeping_tasks` (Phase 5)
+- **Fungsi**: Penjadwalan tugas kebersihan kamar rutin, turnover tamu baru, deep cleaning, atau area bersama dengan checklist terkonfigurasi, bukti foto sebelum/sesudah, dan laporan temuan barang rusak/hilang.
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `UNIQUE (task_number)`
+  - `INDEX (property_id, scheduled_date)`
+  - `INDEX (room_id, scheduled_date, status)`
+  - `INDEX (assigned_to, status)`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `housekeeping_logs` (Phase 5)
+- **Fungsi**: Jejak aktivitas penugasan, pengerjaan checklist, penyerahan verifikasi, dan penyelesaian tugas kebersihan.
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (housekeeping_task_id, created_at)`
+  - `FOREIGN KEY (housekeeping_task_id) REFERENCES housekeeping_tasks(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`
+
+### Tabel: `internal_notifications` (Phase 5)
+- **Fungsi**: Fondasi notifikasi in-app internal untuk mengingatkan tiket baru, penugasan, tiket terlambat (overdue), dan permintaan verifikasi.
+- **Index & Foreign Keys**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (user_id, is_read)`
+  - `INDEX (created_at)`
+  - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL`
+
 ---
 
-## 3. Aturan Integritas & Anti-Double Booking
+## 3. Aturan Integritas, Anti-Double Booking & Batasan Bisnis Phase 5
 
 1. **Pencegahan Overlapping Booking**:
    Sebelum status booking diubah menjadi `confirmed` atau `active`, sistem mengecek apakah ada booking lain pada `room_id` yang sama dengan rentang waktu beririsan:
    $$\text{Existing.start\_date} < \text{New.end\_date} \quad \text{AND} \quad \text{Existing.end\_date} > \text{New.start\_date}$$
    dengan status `IN ('confirmed', 'active')`.
-2. **Kunci Kamar Saat Maintenance**:
-   Kamar berstatus `maintenance` atau `dirty` tidak dapat dipilih untuk booking instan sebelum statusnya dikembalikan ke `available` oleh staf housekeeping/pengelola.
-3. **Penyimpanan Nilai Uang & Presisi Utilitas**:
-   Seluruh nilai uang, tarif, dan kuantitas meter menggunakan tipe data `DECIMAL(14, 2)` guna mencegah kehilangan presisi akibat floating point rounding.
+2. **Kunci Kamar Saat Maintenance & Decoupling Housekeeping**:
+   Kamar berstatus `maintenance` atau `dirty` tidak dapat dipilih untuk booking instan sebelum statusnya dikembalikan ke `available` oleh pengelola. Pengerjaan housekeeping atau verifikasi kebersihan **TIDAK PERNAH** secara otomatis mengubah status kamar menjadi vacant atau memanipulasi jadwal booking aktif tanpa workflow resmi rental lifecycle.
+3. **Penyimpanan Nilai Uang & Presisi Utilitas & Biaya Maintenance**:
+   Seluruh nilai uang sewa, tagihan, tarif, serta biaya tenaga kerja (`labor_cost`) dan biaya bahan (`material_cost`) pada tiket perbaikan menggunakan tipe data `DECIMAL(14, 2)` untuk menjamin integritas akuntansi.
 4. **Idempotensi & Pencegahan Tagihan Ganda (Anti-Double Billing)**:
    Setiap pembacaan meter yang disetujui hanya dapat diterbitkan menjadi tagihan tepat satu kali (`is_billed = true` dan `invoice_id` terkunci). Operasi penagihan utilitas dilindungi oleh transaksi database dengan row-level lock (`lockForUpdate`). Upaya kedua otomatis ditolak dengan `422 Unprocessable Content`.
 5. **Baseline Pembacaan Pertama & Non-Retroaktivitas Tarif**:
    Pembacaan pertama untuk kamar/meter baru wajib menggunakan `meter.initial_reading` sebagai baseline pembacaan sebelumnya agar penyewa baru tidak menanggung akumulasi meteran historis. Perubahan tarif baru berlaku prospektif dan tidak boleh mengubah angka tagihan atau pembacaan masa lalu secara otomatis.
+6. **Pencegahan Tugas Kebersihan Aktif Duplikat (Anti-Duplicate Housekeeping)**:
+   Sistem secara otomatis menolak pembuatan tugas kebersihan aktif (`scheduled`, `assigned`, `in_progress`, `pending_verification`) untuk kamar (`room_id`) yang sama pada tanggal jadwal (`scheduled_date`) yang sama dengan status `422 Unprocessable Content`, kecuali jika pengelola secara eksplisit menyertakan flag `allow_duplicate`.
+7. **Idempotensi Penautan Keluhan ke Tiket Perbaikan (Complaint-Maintenance Link)**:
+   Penautan keluhan penyewa ke tiket perbaikan bersifat idempoten: jika `complaint->maintenance_request_id` sudah ada, pemanggilan endpoint link tidak akan membuat tiket ganda melainkan mengembalikan tiket maintenance yang sudah terhubung.
+8. **Isolasi Keluhan Finansial dari Modifikasi Invoice**:
+   Keluhan yang berkategori tagihan (`billing`) tidak pernah memodifikasi invoice atau pembayaran secara otomatis. Seluruh penyesuaian nominal harus melalui alur koreksi finansial yang sah.
 

@@ -84,3 +84,41 @@ Dokumen ini mencatat keputusan-keputusan teknis fundamental, pertimbangan altern
 - **Konsekuensi**:
   - Permintaan verifikasi konkuren kedua akan tertahan hingga transaksi pertama selesai, lalu digagalkan karena status pembayaran sudah bukan `pending`.
   - Pelunasan invoice memicu transisi status booking secara konsisten dan aman dari race condition.
+
+---
+
+## ADR-009: Verifikasi Dua Tahap pada Pemeliharaan (Maintenance Two-Stage Verification)
+- **Status**: Disetujui (Accepted)
+- **Konteks**: Teknisi di lapangan rentan menandai perbaikan "selesai" tanpa standar kualitas fisik, pencatatan biaya suku cadang yang akurat, atau bukti foto sesudah pengerjaan.
+- **Keputusan**: Menerapkan siklus state machine di mana teknisi hanya dapat mengubah status menjadi `pending_verification` dengan melampirkan diagnosis, tindakan perbaikan, biaya tenaga kerja, biaya material, dan foto after. Tiket hanya dapat berpindah ke `completed` setelah diverifikasi oleh peran pengawas (Supervisor, Manager, atau Owner).
+- **Konsekuensi**:
+  - Mengeliminasi klaim sepihak teknisi.
+  - Setiap pengeluaran biaya perbaikan memiliki penanggung jawab persetujuan (`verified_by`).
+
+---
+
+## ADR-010: Idempotensi dan Isolasi Keluhan Penyewa (Complaint Idempotency & Financial Decoupling)
+- **Status**: Disetujui (Accepted)
+- **Konteks**: Keluhan yang berulang atau penautan keluhan ke perbaikan fisik dapat menyebabkan duplikasi tiket maintenance. Selain itu, keluhan berkategori tagihan berisiko disalahgunakan untuk mengubah status invoice secara otomatis.
+- **Keputusan**:
+  1. Penautan keluhan ke tiket perbaikan dibuat idempoten dengan menyimpan `maintenance_request_id` pada tabel `complaints`. Request berulang akan mengembalikan data tiket yang sudah ada tanpa menduplikasi data.
+  2. Keluhan berkategori `billing` diisolasi sepenuhnya dari manipulasi database invoice atau payment. Seluruh penyesuaian finansial tetap wajib melalui alur revisi invoice resmi.
+  3. Catatan koordinasi internal staf (`is_internal = true`) disaring secara otomatis oleh server dari pandangan penyewa.
+
+---
+
+## ADR-011: Proteksi Anti-Tugas Aktif Duplikat pada Housekeeping
+- **Status**: Disetujui (Accepted)
+- **Konteks**: Penjadwalan kebersihan kamar yang dibuat berkali-kali pada tanggal yang sama membingungkan staf pelaksana dan membuang sumber daya operasional.
+- **Keputusan**: Validasi server-side otomatis memeriksa keberadaan tugas aktif (`scheduled`, `assigned`, `in_progress`, `pending_verification`) untuk `room_id` dan `scheduled_date` yang sama. Jika ada, sistem melempar `DomainException` (HTTP 422) kecuali diberikan flag override `allow_duplicate`.
+- **Konsekuensi**:
+  - Mencegah jadwal ganda yang tumpang tindih.
+  - Memisahkan status housekeeping dari ketersediaan kamar dan siklus sewa kamar.
+
+---
+
+## ADR-012: Fondasi Notifikasi In-App Internal Tanpa Ketergantungan Layanan Pihak Ketiga
+- **Status**: Disetujui (Accepted)
+- **Konteks**: Pengguna membutuhkan pemberitahuan saat tiket dibuat, ditugaskan, atau terlambat. Integrasi pihak ketiga (WhatsApp Gateway / Push Notification Firebase / Email SMTP) belum terkonfigurasi dan tidak boleh diasumsikan aktif.
+- **Keputusan**: Membangun tabel dan service notifikasi internal `internal_notifications` yang menyimpan pesan, tipe event, status baca (`is_read`), dan metadata entitas. Service ini dapat diperluas (pluggable) di masa depan untuk mendistribusikan notifikasi ke channel eksternal tanpa merombak arsitektur event.
+

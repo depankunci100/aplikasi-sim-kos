@@ -2,8 +2,12 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
+use App\Http\Controllers\Api\V1\ComplaintController;
+use App\Http\Controllers\Api\V1\HousekeepingController;
 use App\Http\Controllers\Api\V1\InspectionController;
 use App\Http\Controllers\Api\V1\InvoiceController;
+use App\Http\Controllers\Api\V1\MaintenanceController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PropertyController;
 use App\Http\Controllers\Api\V1\RoomController;
@@ -82,5 +86,47 @@ Route::prefix('v1')->group(function () {
         Route::post('/utilities/readings/{id}/generate-invoice', [UtilityController::class, 'generateInvoice']);
         Route::get('/utilities/readings/{id}/proof-photo', [UtilityController::class, 'proofPhoto']);
         Route::get('/utilities/tenant/consumption', [UtilityController::class, 'tenantConsumption']);
+
+        // Phase 5: Maintenance Management
+        Route::get('/maintenance', [MaintenanceController::class, 'index']);
+        Route::post('/maintenance', [MaintenanceController::class, 'store']);
+        Route::get('/maintenance/{id}', [MaintenanceController::class, 'show']);
+        Route::post('/maintenance/{id}/triage', [MaintenanceController::class, 'triage']);
+        Route::post('/maintenance/{id}/assign', [MaintenanceController::class, 'assign']);
+        Route::post('/maintenance/{id}/start', [MaintenanceController::class, 'start']);
+        Route::post('/maintenance/{id}/submit-verification', [MaintenanceController::class, 'submitVerification']);
+        Route::post('/maintenance/{id}/verify', [MaintenanceController::class, 'verify']);
+        Route::post('/maintenance/{id}/reject-cancel', [MaintenanceController::class, 'rejectOrCancel']);
+        Route::get('/maintenance/{id}/photo', [MaintenanceController::class, 'photo']);
+
+        // Phase 5: Tenant Complaints
+        Route::get('/complaints', [ComplaintController::class, 'index']);
+        Route::post('/complaints', [ComplaintController::class, 'store']);
+        Route::get('/complaints/{id}', [ComplaintController::class, 'show']);
+        Route::post('/complaints/{id}/acknowledge', [ComplaintController::class, 'acknowledge']);
+        Route::post('/complaints/{id}/assign', [ComplaintController::class, 'assign']);
+        Route::post('/complaints/{id}/comments', [ComplaintController::class, 'addComment']);
+        Route::post('/complaints/{id}/link-maintenance', [ComplaintController::class, 'linkMaintenance']);
+        Route::post('/complaints/{id}/resolve', [ComplaintController::class, 'resolve']);
+        Route::post('/complaints/{id}/confirm-reopen', [ComplaintController::class, 'confirmOrReopen']);
+        Route::post('/complaints/{id}/reject', [ComplaintController::class, 'reject']);
+        Route::get('/complaints/{id}/photo', [ComplaintController::class, 'photo']);
+
+        // Phase 5: Housekeeping Management
+        Route::get('/housekeeping', [HousekeepingController::class, 'index']);
+        Route::post('/housekeeping', [HousekeepingController::class, 'store']);
+        Route::get('/housekeeping/{id}', [HousekeepingController::class, 'show']);
+        Route::post('/housekeeping/{id}/assign', [HousekeepingController::class, 'assign']);
+        Route::post('/housekeeping/{id}/start', [HousekeepingController::class, 'start']);
+        Route::post('/housekeeping/{id}/submit-verification', [HousekeepingController::class, 'submitVerification']);
+        Route::post('/housekeeping/{id}/verify', [HousekeepingController::class, 'verify']);
+        Route::post('/housekeeping/{id}/cancel', [HousekeepingController::class, 'cancel']);
+        Route::get('/housekeeping/{id}/photo', [HousekeepingController::class, 'photo']);
+
+        // Phase 5: Internal Notifications
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     });
 });

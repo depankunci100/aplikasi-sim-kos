@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\ComplaintWebController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\HousekeepingWebController;
 use App\Http\Controllers\Web\InspectionWebController;
 use App\Http\Controllers\Web\InvoiceWebController;
+use App\Http\Controllers\Web\MaintenanceWebController;
 use App\Http\Controllers\Web\PaymentVerificationController;
 use App\Http\Controllers\Web\RoomWebController;
 use App\Http\Controllers\Web\UtilityWebController;
@@ -79,5 +82,50 @@ Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(functi
         Route::post('/readings/{id}/correct', [UtilityWebController::class, 'correctReading'])->name('readings.correct');
         Route::post('/readings/{id}/generate-invoice', [UtilityWebController::class, 'generateInvoice'])->name('readings.generate-invoice');
         Route::get('/readings/{id}/proof', [UtilityWebController::class, 'streamProof'])->name('readings.proof');
+    });
+
+    // Phase 5: Maintenance Management (All authenticated roles)
+    Route::prefix('maintenance')->name('maintenance.')->group(function () {
+        Route::get('/', [MaintenanceWebController::class, 'index'])->name('index');
+        Route::get('/create', [MaintenanceWebController::class, 'create'])->name('create');
+        Route::post('/', [MaintenanceWebController::class, 'store'])->name('store');
+        Route::get('/{id}', [MaintenanceWebController::class, 'show'])->name('show');
+        Route::post('/{id}/triage', [MaintenanceWebController::class, 'triage'])->name('triage');
+        Route::post('/{id}/assign', [MaintenanceWebController::class, 'assign'])->name('assign');
+        Route::post('/{id}/start', [MaintenanceWebController::class, 'start'])->name('start');
+        Route::post('/{id}/submit-verification', [MaintenanceWebController::class, 'submitVerification'])->name('submit-verification');
+        Route::post('/{id}/verify', [MaintenanceWebController::class, 'verify'])->name('verify');
+        Route::post('/{id}/reject-cancel', [MaintenanceWebController::class, 'rejectOrCancel'])->name('reject-cancel');
+        Route::get('/{id}/photo', [MaintenanceWebController::class, 'photo'])->name('photo');
+    });
+
+    // Phase 5: Tenant Complaints
+    Route::prefix('complaints')->name('complaints.')->group(function () {
+        Route::get('/', [ComplaintWebController::class, 'index'])->name('index');
+        Route::get('/create', [ComplaintWebController::class, 'create'])->name('create');
+        Route::post('/', [ComplaintWebController::class, 'store'])->name('store');
+        Route::get('/{id}', [ComplaintWebController::class, 'show'])->name('show');
+        Route::post('/{id}/acknowledge', [ComplaintWebController::class, 'acknowledge'])->name('acknowledge');
+        Route::post('/{id}/assign', [ComplaintWebController::class, 'assign'])->name('assign');
+        Route::post('/{id}/comments', [ComplaintWebController::class, 'addComment'])->name('comments');
+        Route::post('/{id}/link-maintenance', [ComplaintWebController::class, 'linkMaintenance'])->name('link-maintenance');
+        Route::post('/{id}/resolve', [ComplaintWebController::class, 'resolve'])->name('resolve');
+        Route::post('/{id}/confirm-reopen', [ComplaintWebController::class, 'confirmOrReopen'])->name('confirm-reopen');
+        Route::post('/{id}/reject', [ComplaintWebController::class, 'reject'])->name('reject');
+        Route::get('/{id}/photo', [ComplaintWebController::class, 'photo'])->name('photo');
+    });
+
+    // Phase 5: Housekeeping Management
+    Route::prefix('housekeeping')->name('housekeeping.')->group(function () {
+        Route::get('/', [HousekeepingWebController::class, 'index'])->name('index');
+        Route::get('/create', [HousekeepingWebController::class, 'create'])->name('create');
+        Route::post('/', [HousekeepingWebController::class, 'store'])->name('store');
+        Route::get('/{id}', [HousekeepingWebController::class, 'show'])->name('show');
+        Route::post('/{id}/assign', [HousekeepingWebController::class, 'assign'])->name('assign');
+        Route::post('/{id}/start', [HousekeepingWebController::class, 'start'])->name('start');
+        Route::post('/{id}/submit-verification', [HousekeepingWebController::class, 'submitVerification'])->name('submit-verification');
+        Route::post('/{id}/verify', [HousekeepingWebController::class, 'verify'])->name('verify');
+        Route::post('/{id}/cancel', [HousekeepingWebController::class, 'cancel'])->name('cancel');
+        Route::get('/{id}/photo', [HousekeepingWebController::class, 'photo'])->name('photo');
     });
 });

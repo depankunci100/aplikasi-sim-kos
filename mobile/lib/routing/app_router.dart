@@ -17,6 +17,17 @@ import '../features/properties/screens/property_detail_screen.dart';
 import '../features/utilities/models/utility_meter_model.dart';
 import '../features/utilities/screens/utility_meters_screen.dart';
 import '../features/utilities/screens/record_meter_screen.dart';
+import '../features/maintenance/models/maintenance_model.dart';
+import '../features/maintenance/screens/maintenance_list_screen.dart';
+import '../features/maintenance/screens/maintenance_detail_screen.dart';
+import '../features/maintenance/screens/maintenance_form_screen.dart';
+import '../features/complaints/models/complaint_model.dart';
+import '../features/complaints/screens/complaints_list_screen.dart';
+import '../features/complaints/screens/complaint_detail_screen.dart';
+import '../features/complaints/screens/complaint_form_screen.dart';
+import '../features/housekeeping/models/housekeeping_model.dart';
+import '../features/housekeeping/screens/housekeeping_list_screen.dart';
+import '../features/housekeeping/screens/housekeeping_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -59,6 +70,50 @@ final routerProvider = Provider<GoRouter>((ref) {
                 currentReading: 0,
               );
           return RecordMeterScreen(meter: meter);
+        },
+      ),
+      GoRoute(
+        path: '/maintenance',
+        builder: (context, state) => const MaintenanceListScreen(),
+      ),
+      GoRoute(
+        path: '/maintenance/new',
+        builder: (context, state) => const MaintenanceFormScreen(),
+      ),
+      GoRoute(
+        path: '/maintenance/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final item = state.extra as MaintenanceRequestModel?;
+          return MaintenanceDetailScreen(maintenanceId: id, initialMaintenance: item);
+        },
+      ),
+      GoRoute(
+        path: '/complaints',
+        builder: (context, state) => const ComplaintsListScreen(),
+      ),
+      GoRoute(
+        path: '/complaints/new',
+        builder: (context, state) => const ComplaintFormScreen(),
+      ),
+      GoRoute(
+        path: '/complaint/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final item = state.extra as ComplaintModel?;
+          return ComplaintDetailScreen(complaintId: id, initialComplaint: item);
+        },
+      ),
+      GoRoute(
+        path: '/housekeeping',
+        builder: (context, state) => const HousekeepingListScreen(),
+      ),
+      GoRoute(
+        path: '/housekeeping/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final item = state.extra as HousekeepingTaskModel?;
+          return HousekeepingDetailScreen(taskId: id, initialTask: item);
         },
       ),
       GoRoute(

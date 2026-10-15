@@ -373,3 +373,62 @@ status=pending_review
 ```
 *Keterangan:* Jika `target_invoice_id` disetel `null`, sistem otomatis menerbitkan invoice utilitas mandiri (`INV-UTL-...`). Jika `target_invoice_id` diisi, line item utilitas akan dilampirkan ke invoice sewa yang sedang aktif. Upaya penagihan kedua otomatis ditolak dengan pesan error dan status 422 (Anti-Double Billing).
 
+---
+
+## 5. Endpoints Phase 5 (Maintenance, Complaints, Housekeeping & Notifikasi)
+
+### A. Modul Maintenance Management
+
+| Method | Endpoint | Role | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/maintenance` | Authenticated | Daftar tiket perbaikan dengan filter properti, status, kategori, teknisi, SLA overdue |
+| `POST` | `/api/v1/maintenance` | Tenant, Staff, Admin | Ajukan tiket perbaikan baru (mendukung multi foto sebelum pengerjaan) |
+| `GET` | `/api/v1/maintenance/{id}` | Authorised User | Detail tiket perbaikan, suku cadang, biaya, log aktivitas |
+| `POST` | `/api/v1/maintenance/{id}/triage` | Staff, Manager, Owner | Triase prioritas, kategori kerusakan, dan pembaruan batas waktu SLA |
+| `POST` | `/api/v1/maintenance/{id}/assign` | Manager, Owner, Staff | Penugasan teknisi/staf pelaksana dan jadwal kunjungan |
+| `POST` | `/api/v1/maintenance/{id}/start` | Staff, Teknisi | Teknisi memulai pengerjaan di lokasi (status `in_progress`) |
+| `POST` | `/api/v1/maintenance/{id}/submit-verification` | Staff, Teknisi | Penyerahan hasil perbaikan dengan catatan tindakan, suku cadang, biaya tenaga kerja, biaya bahan, dan foto after |
+| `POST` | `/api/v1/maintenance/{id}/verify` | Manager, Owner, Admin | Verifikasi hasil pengerjaan fisik oleh supervisor dan penyelesaian tiket |
+| `POST` | `/api/v1/maintenance/{id}/reject-cancel` | Authorised Role | Penolakan atau pembatalan tiket dengan alasan wajib |
+| `GET` | `/api/v1/maintenance/{id}/photo` | Authorised Role | Streaming aman foto privat before/after dengan kontrol hak akses |
+
+### B. Modul Tenant Complaints
+
+| Method | Endpoint | Role | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/complaints` | Authenticated | Daftar keluhan (Penyewa terisolasi hanya miliknya; Staf berbasis cabang) |
+| `POST` | `/api/v1/complaints` | Tenant, Staf | Pengajuan keluhan baru ber-tiket `CMP-YYYYMMDD-XXXXX` dengan foto bukti |
+| `GET` | `/api/v1/complaints/{id}` | Authorised User | Detail keluhan, riwayat komentar, penanggung jawab, catatan penyelesaian |
+| `POST` | `/api/v1/complaints/{id}/acknowledge` | Staff, Manager, Owner | Petugas mengakui dan meninjau keluhan (merekam `first_responded_at`) |
+| `POST` | `/api/v1/complaints/{id}/assign` | Staff, Manager, Owner | Penetapan penanggung jawab keluhan (status `in_progress`) |
+| `POST` | `/api/v1/complaints/{id}/comments` | Authorised User | Kirim tanggapan publik atau catatan koordinasi internal (`is_internal = true`) |
+| `POST` | `/api/v1/complaints/{id}/link-maintenance` | Staff, Manager, Owner | Penautan idempoten keluhan ke tiket perbaikan fisik |
+| `POST` | `/api/v1/complaints/{id}/resolve` | Staff, Manager, Owner | Petugas menandai keluhan selesai dan mengisi catatan solusi |
+| `POST` | `/api/v1/complaints/{id}/confirm-reopen` | Tenant Pelapor | Penyewa mengonfirmasi selesai (rating 1–5 & feedback) atau membuka kembali (`reopen`) |
+| `POST` | `/api/v1/complaints/{id}/reject` | Staff, Manager, Owner | Penolakan keluhan dengan alasan jelas |
+| `GET` | `/api/v1/complaints/{id}/photo` | Authorised User | Streaming aman foto privat lampiran keluhan |
+
+### C. Modul Housekeeping Management
+
+| Method | Endpoint | Role | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/housekeeping` | Authenticated | Daftar tugas kebersihan kamar dan area bersama dengan filter tanggal & status |
+| `POST` | `/api/v1/housekeeping` | Staff, Manager, Owner | Penjadwalan tugas kebersihan (dilengkapi proteksi anti-duplicate active task) |
+| `GET` | `/api/v1/housekeeping/{id}` | Authorised User | Detail tugas, checklist interaktif, progres, log audit |
+| `POST` | `/api/v1/housekeeping/{id}/assign` | Staff, Manager, Owner | Penugasan petugas kebersihan properti |
+| `POST` | `/api/v1/housekeeping/{id}/start` | Staff, Assignee | Memulai pembersihan kamar / area dengan dokumentasi foto before |
+| `POST` | `/api/v1/housekeeping/{id}/submit-verification` | Staff, Assignee | Submit checklist yang telah selesai, catatan barang rusak/hilang, dan foto after |
+| `POST` | `/api/v1/housekeeping/{id}/verify` | Manager, Owner, Admin | Supervisor memverifikasi hasil kebersihan fisik dan menyelesaikan tugas |
+| `POST` | `/api/v1/housekeeping/{id}/cancel` | Manager, Owner, Admin | Pembatalan tugas kebersihan terjadwal dengan alasan |
+| `GET` | `/api/v1/housekeeping/{id}/photo` | Authorised User | Streaming aman foto bukti kebersihan before/after |
+
+### D. Modul In-App Internal Notifications
+
+| Method | Endpoint | Role | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/notifications` | Authenticated | Mengambil daftar notifikasi pengguna (tiket baru, penugasan, overdue) |
+| `GET` | `/api/v1/notifications/unread-count` | Authenticated | Menghitung jumlah notifikasi yang belum dibaca |
+| `POST` | `/api/v1/notifications/{id}/read` | Authenticated | Menandai satu notifikasi telah dibaca |
+| `POST` | `/api/v1/notifications/read-all` | Authenticated | Menandai seluruh notifikasi pengguna sebagai terbaca |
+
+

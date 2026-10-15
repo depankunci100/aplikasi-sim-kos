@@ -51,4 +51,8 @@ class ApiEndpoints {
   static const String utilityReadings = '/utilities/readings';
   static const String utilityTariffs = '/utilities/tariffs';
   static const String tenantConsumption = '/utilities/tenant/consumption';
+
+  static const String maintenance = '/maintenance';
+  static const String housekeeping = '/housekeeping';
+  static const String notifications = '/notifications';
 }

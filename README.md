@@ -73,7 +73,12 @@ aplikasi-sim-kos/
    - Alur review kasir/manajer: persetujuan, penolakan dengan alasan wajib, dan koreksi berizin dengan audit trail lengkap (`utility_reading_logs`).
    - Integrasi tagihan ke invoice existing via `invoice_items` breakdown, diproteksi transaksi database dengan row-level lock (`lockForUpdate`) menjamin anti-double billing (idempoten).
    - Dukungan penuh di Web Dashboard Bootstrap 5 dan aplikasi Flutter Mobile (Android/iOS).
-7. **Mobile Experience (Flutter)**:
+7. **Maintenance, Keluhan Penyewa & Housekeeping (Tahap 5)**:
+   - **Maintenance Management**: Siklus perbaikan fasilitas lengkap (`reported` $\rightarrow$ `triaged` $\rightarrow$ `assigned` $\rightarrow$ `in_progress` $\rightarrow$ `pending_verification` $\rightarrow$ `completed`), penugasan teknisi, diagnosis, suku cadang, pencatatan biaya (tenaga kerja & material), batas waktu SLA otomatis berbasis prioritas, pelacakan tiket terlambat (overdue), streaming foto privat before/after, dan jejak audit lengkap (`maintenance_logs`).
+   - **Tenant Complaints**: Penomoran tiket unik (`CMP-YYYYMMDD-XXXXX`), isolasi penyewa hanya melihat tiket miliknya, pencatatan waktu respons pertama (`first_responded_at`), thread percakapan dengan catatan koordinasi internal (`is_internal`) yang disaring otomatis oleh server, penautan idempoten ke tiket perbaikan, serta alur konfirmasi penyelesaian (rating 1–5 bintang) atau pembukaan kembali (`reopened`). Keluhan tagihan diisolasi dari modifikasi invoice otomatis.
+   - **Housekeeping Management**: Penjadwalan kebersihan kamar/area bersama, checklist terkonfigurasi, proteksi server-side anti-tugas aktif duplikat untuk kamar dan tanggal yang sama, dokumentasi bukti foto before/after, pelaporan temuan barang rusak/hilang, dan evaluasi verifikasi supervisor. Housekeeping tidak memanipulasi status ketersediaan kamar di luar siklus sewa.
+   - **Internal In-App Notifications**: Fondasi notifikasi dalam aplikasi (`internal_notifications`) untuk peringatan tiket baru, penugasan teknisi, pengerjaan terlambat, dan verifikasi selesai.
+8. **Mobile Experience (Flutter)**:
    - UI modern berbasis Material Design 3 dengan bahasa Indonesia.
    - State management reaktif menggunakan **Riverpod**.
    - Navigasi deklaratif dengan **GoRouter**.

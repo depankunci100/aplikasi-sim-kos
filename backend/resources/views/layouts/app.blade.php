@@ -111,6 +111,21 @@
                             <li><a class="dropdown-item" href="{{ route('dashboard.utilities.tariffs.index') }}"><i class="bi bi-tags me-2"></i>Pengaturan Tarif</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('dashboard.maintenance.*') ? 'active' : '' }}" href="{{ route('dashboard.maintenance.index') }}">
+                            <i class="bi bi-tools me-1"></i> Perbaikan
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('dashboard.complaints.*') ? 'active' : '' }}" href="{{ route('dashboard.complaints.index') }}">
+                            <i class="bi bi-chat-left-dots me-1"></i> Keluhan
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('dashboard.housekeeping.*') ? 'active' : '' }}" href="{{ route('dashboard.housekeeping.index') }}">
+                            <i class="bi bi-stars me-1"></i> Kebersihan
+                        </a>
+                    </li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <div class="text-end d-none d-sm-block">

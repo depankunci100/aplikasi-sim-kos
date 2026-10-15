@@ -62,6 +62,21 @@ class Room extends Model
         return $this->hasMany(UtilityReading::class);
     }
 
+    public function maintenanceRequests(): HasMany
+    {
+        return $this->hasMany(MaintenanceRequest::class);
+    }
+
+    public function complaints(): HasMany
+    {
+        return $this->hasMany(Complaint::class);
+    }
+
+    public function housekeepingTasks(): HasMany
+    {
+        return $this->hasMany(HousekeepingTask::class);
+    }
+
     public function isAvailable(): bool
     {
         return $this->is_active && $this->status === RoomStatus::AVAILABLE;
