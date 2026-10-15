@@ -189,3 +189,29 @@ mobile/
    - MySQL 8.0 / MariaDB 10.11 dengan backup harian terjadwal.
    - Redis untuk Cache & Horizon Queue Worker (notifikasi email/WA dan kalkulasi invoice).
    - CI/CD via GitHub Actions untuk linting, automated testing, dan validasi build Flutter APK.
+
+---
+
+## 6. Arsitektur Modul Inspeksi & Checklist Kamar (Tahap 3)
+
+### A. Domain Service: `InspectionService`
+Berada pada `app/Services/Inspection/InspectionService.php`, merangkum seluruh aturan bisnis inspeksi:
+1. **Checklist Provisioning**: Otomatis menduplikasi master aset fisik (`room_assets`) dari kamar atau menggunakan template standar 8 item checklist (`DEFAULT_CHECKLIST_ITEMS`).
+2. **State Transition Engine**:
+   - `scheduled` -> `in_progress` (oleh Staf/Inspector saat mulai pemeriksaan).
+   - `in_progress` -> `completed` (setelah checklist diperiksa & foto diunggah; menetapkan batas waktu keputusan penyewa `tenant_due_at`).
+   - `completed` -> `approved_by_tenant` (Penyewa menyetujui kondisi tanpa sanggahan).
+   - `completed` -> `objected_by_tenant` (Penyewa mengajukan keberatan dengan catatan spesifik).
+3. **Baseline Comparison Engine**:
+   Membandingkan inspeksi check-out dengan inspeksi baseline (check-in awal):
+   - Membandingkan gradasi kondisi: `good` (4) > `fair` (3) > `poor` (2) > `damaged` (1) > `missing` (0).
+   - Mendeteksi penurunan kondisi (`is_degraded = true`) atau butuh perbaikan (`repair_required = true`).
+   - Menghitung total estimasi biaya kerusakan (`total_damage_cost`) untuk pemotongan deposit sewa.
+
+### B. Keamanan Media & Private Disk Storage
+- Seluruh foto bukti inspeksi disimpan di private storage (`storage/app/private/inspections/{id}/`).
+- Tidak ada foto yang terekspos langsung ke URL publik.
+- Akses file foto disalurkan melalui controller streaming terotentikasi Sanctum/Session dengan pemeriksaan hak akses properti dan penyewa (`canAccessInspection`).
+
+### C. Audit Trail Terintegrasi (`inspection_logs`)
+Setiap aksi signifikan (pembuatan jadwal, mulai inspeksi, update butir checklist, unggah foto, penyelesaian inspeksi, persetujuan penyewa, serta keberatan) dicatat secara permanen dengan `user_id`, aksi, deskripsi, dan metadata kontekstual.

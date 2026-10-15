@@ -58,7 +58,14 @@ aplikasi-sim-kos/
    - Pembuatan tagihan terperinci (Sewa pokok, deposit, denda, pemakaian utilitas).
    - Verifikasi bukti transfer manual atau integrasi payment gateway.
    - Laporan laba/rugi, arus kas, dan tingkat keterisian (occupancy rate).
-4. **Mobile Experience (Flutter)**:
+4. **Inspeksi Kamar, Checklist & Bukti Foto (Tahap 3)**:
+   - Alur inspeksi terpadu: Check-in awal, berkala selama masa sewa, dan check-out akhir.
+   - Master checklist otomatis dari aset kamar (`room_assets`) atau 8 butir standar fasilitas.
+   - Foto bukti visual tersimpan aman di private storage dan disajikan via stream terotentikasi.
+   - Hak konfirmasi persetujuan (`approve`) atau pengajuan keberatan (`object`) bagi penyewa dengan batas tenggat waktu.
+   - Komparasi cerdas kondisi check-out vs baseline check-in dengan kalkulasi otomatis estimasi biaya kerusakan pemotong deposit.
+   - Rekam audit trail lengkap (`inspection_logs`) untuk setiap tahapan aksi.
+5. **Mobile Experience (Flutter)**:
    - UI modern berbasis Material Design 3 dengan bahasa Indonesia.
    - State management reaktif menggunakan **Riverpod**.
    - Navigasi deklaratif dengan **GoRouter**.
@@ -115,11 +122,11 @@ flutter run
 ```
 
 ### 4. Menjalankan Pengujian Otomatis (Test Suites)
-- **Backend Test Suite (25 Tests Passing)**:
+- **Backend Test Suite (34 Tests Passing)**:
   ```bash
   cd backend && php artisan test
   ```
-- **Flutter Test Suite & Static Analysis (100% Pass)**:
+- **Flutter Test Suite & Static Analysis (13 Tests Passing, 100% Pass)**:
   ```bash
   cd mobile
   flutter analyze

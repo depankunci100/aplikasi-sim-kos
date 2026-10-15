@@ -31,6 +31,11 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.fact_check_rounded),
+            tooltip: 'Inspeksi Kamar',
+            onPressed: () => context.push('/inspections'),
+          ),
+          IconButton(
             icon: const Icon(Icons.receipt_long_rounded),
             tooltip: 'Tagihan & Pembayaran',
             onPressed: () => context.push('/invoices'),
@@ -135,6 +140,44 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                       Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Quick Action Card for Inspeksi Kamar
+              InkWell(
+                onTap: () => context.push('/inspections'),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withAlpha(80)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.fact_check_rounded, color: Colors.orange, size: 28),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Inspeksi & Checklist Kamar',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.brown),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Cek serah terima check-in, setujui checklist kondisi, atau laporkan keberatan',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.orange),
                     ],
                   ),
                 ),

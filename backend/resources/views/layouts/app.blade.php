@@ -96,6 +96,11 @@
                             <i class="bi bi-receipt me-1"></i> Tagihan (Invoice)
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('dashboard.inspections.*') ? 'active' : '' }}" href="{{ route('dashboard.inspections.index') }}">
+                            <i class="bi bi-clipboard2-check me-1"></i> Inspeksi Kamar
+                        </a>
+                    </li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <div class="text-end d-none d-sm-block">

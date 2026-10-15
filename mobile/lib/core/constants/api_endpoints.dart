@@ -44,5 +44,6 @@ class ApiEndpoints {
   static const String properties = '/properties';
   static const String bookings = '/bookings';
   static const String invoices = '/invoices';
+  static const String inspections = '/inspections';
   static const String complaints = '/complaints';
 }

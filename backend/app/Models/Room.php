@@ -42,6 +42,16 @@ class Room extends Model
         return $this->hasMany(Booking::class);
     }
 
+    public function assets(): HasMany
+    {
+        return $this->hasMany(RoomAsset::class);
+    }
+
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(Inspection::class);
+    }
+
     public function isAvailable(): bool
     {
         return $this->is_active && $this->status === RoomStatus::AVAILABLE;

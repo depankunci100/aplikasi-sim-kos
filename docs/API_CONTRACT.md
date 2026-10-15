@@ -204,3 +204,91 @@ proof_file: [FILE BINER JPG/PNG/PDF, Max 5MB]
 | `GET` | `/reports/revenue` | Arus kas masuk (pendapatan sewa & guesthouse) | Owner, Manager |
 | `GET` | `/reports/expenses` | Rekap pengeluaran operasional cabang | Owner, Manager |
 | `GET` | `/reports/profit-loss`| Ringkasan laba bersih per properti | Owner, Super Admin |
+
+---
+
+### I. Inspeksi Kamar, Checklist & Bukti Foto (`/inspections`)
+
+| Method | Endpoint | Deskripsi | Akses |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/inspections` | Daftar data inspeksi (filter: `status`, `property_id`, `room_id`, `type`) | Authenticated (Tenant dibatasi kamar/booking miliknya) |
+| `POST` | `/inspections` | Penjadwalan inspeksi baru (otomatis salin master asset/template checklist) | Owner, Manager, Staff, Super Admin |
+| `GET` | `/inspections/{id}` | Detail inspeksi lengkap dengan checklist items, foto bukti, dan audit logs | Authenticated (Otorisasi multi-tenant & hak akses) |
+| `POST` | `/inspections/{id}/start` | Mulai pelaksanaan inspeksi (status `scheduled` -> `in_progress`) | Owner, Manager, Staff pelaksana |
+| `PUT` | `/inspections/{id}/items/{itemId}` | Perbarui kondisi item checklist, catatan, flag perbaikan, dan estimasi biaya | Owner, Manager, Staff pelaksana |
+| `POST` | `/inspections/{id}/media` | Unggah foto bukti kondisi fisik per item/keseluruhan (multipart) | Owner, Manager, Staff pelaksana |
+| `GET` | `/inspections/{id}/media/{mediaId}/stream` | Tampilkan/stream file foto bukti secara aman via backend (private disk) | Authenticated (Sesuai hak akses inspeksi) |
+| `POST` | `/inspections/{id}/complete` | Selesaikan inspeksi, tetapkan ringkasan kondisi, teruskan ke penyewa | Owner, Manager, Staff pelaksana |
+| `POST` | `/inspections/{id}/approve` | Konfirmasi persetujuan kondisi checklist oleh penyewa | Tenant pemilik booking |
+| `POST` | `/inspections/{id}/object` | Pengajuan keberatan kondisi kamar beserta catatan spesifik oleh penyewa | Tenant pemilik booking |
+| `GET` | `/inspections/{id}/compare/{baselineId}` | Komparasi komprehensif kondisi kamar (e.g. check-out vs check-in) & estimasi biaya kerusakan | Owner, Manager, Staff, Tenant |
+
+#### Contoh Payload Penjadwalan: `POST /api/v1/inspections`
+```json
+{
+  "property_id": 1,
+  "room_id": 1,
+  "booking_id": 5,
+  "type": "check_in",
+  "scheduled_date": "2026-10-16",
+  "inspector_id": 3
+}
+```
+
+#### Contoh Payload Update Item Checklist: `PUT /api/v1/inspections/{id}/items/{itemId}`
+```json
+{
+  "condition": "damaged",
+  "notes": "Remote AC pecah dan filter udara kotor",
+  "repair_required": true,
+  "estimated_cost": 150000
+}
+```
+
+#### Contoh Payload Penyelesaian Inspeksi: `POST /api/v1/inspections/{id}/complete`
+```json
+{
+  "overall_condition": "fair",
+  "inspector_notes": "Kamar layak huni, 1 perbaikan remote AC dibutuhkan."
+}
+```
+
+#### Contoh Payload Persetujuan Penyewa: `POST /api/v1/inspections/{id}/approve`
+```json
+{
+  "notes": "Kondisi kamar sesuai dengan yang diperiksa bersama saat serah terima kunci."
+}
+```
+
+#### Contoh Payload Keberatan Penyewa: `POST /api/v1/inspections/{id}/object`
+```json
+{
+  "objection_notes": "Kran shower kamar mandi bocor dan belum diganti sesuai janji staf pengelola."
+}
+```
+
+#### Contoh Response Komparasi Baseline: `GET /api/v1/inspections/2/compare/1`
+```json
+{
+  "success": true,
+  "message": "Hasil perbandingan kondisi kamar berhasil dikalkulasi.",
+  "data": {
+    "current_inspection": { "id": 2, "inspection_code": "INSP-20261015-002", "type": "check_out" },
+    "baseline_inspection": { "id": 1, "inspection_code": "INSP-20261015-001", "type": "check_in" },
+    "has_degradation": true,
+    "total_damage_cost": 250000,
+    "differences": [
+      {
+        "item_name": "Pendingin Udara (AC)",
+        "category": "Elektronik",
+        "baseline_condition": "good",
+        "current_condition": "damaged",
+        "is_degraded": true,
+        "repair_required": true,
+        "estimated_cost": 250000,
+        "current_notes": "Tidak dingin dan ada kebocoran freon"
+      }
+    ]
+  }
+}
+```

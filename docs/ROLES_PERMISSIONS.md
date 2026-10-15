@@ -41,6 +41,7 @@ Keterangan:
 | **Pembayaran & Verifikasi** | CRUD | R | CRUD | CRU (Kasir) | - | CR (Upload Bukti) |
 | **Pengeluaran Operasional (Expense)**| CRUD | CRUD | CRUD | C (Kasir) | - | - |
 | **Tiket Komplain & Perbaikan** | CRUD | R | CRUD | CRU | RU (Tugasnya)| CR (Komplain sendiri)|
+| **Inspeksi & Checklist Kamar** | CRUD | CRUD (Miliknya) | CRUD (Cabang) | R (Operasional) | CRU (Pelaksana) | RU (Setujui / Keberatan) |
 | **Pengumuman Kos** | CRUD | CRUD | CRUD | R | R | R |
 | **Laporan Finansial & Okupansi** | CRUD | R (Lengkap) | R (Cabang) | R (Shift kasir)| - | - |
 
@@ -58,5 +59,11 @@ Keterangan:
    Penyewa tidak dapat memverifikasi pembayarannya sendiri meskipun mengirim payload verifikasi langsung ke server. Sistem melempar `403 Forbidden` (`Anda tidak dapat memverifikasi pembayaran Anda sendiri`).
 5. **Staff Operational Boundary**:
    Staf operasional (housekeeping/maintenance) tidak memiliki wewenang finansial untuk melihat saldo kasir atau memverifikasi pembayaran bukti transfer.
-6. **Audit Trail**:
-   Aksi kritis seperti verifikasi pembayaran (`verified_by`, `verified_at`, `verification_notes`), penolakan bukti (`rejection_reason`), pembatalan booking, perubahan harga kamar, dan persetujuan pengeluaran dicatat dengan cap `user_id` dan `timestamp`.
+6. **Otorisasi & Integritas Inspeksi Kamar (Tahap 3)**:
+   - **Super Admin**: Memiliki hak administratif global namun tidak boleh melewati audit trail atau validasi bisnis.
+   - **Owner & Manager**: Berhak menjadwalkan inspeksi, menugaskan staf pemeriksa, meninjau komparasi baseline, dan menangani catatan keberatan penyewa.
+   - **Staff**: Melaksanakan inspeksi yang ditugaskan, mengisi kondisi checklist, catatan, dan mengunggah foto bukti fisik. Staf pelaksana tidak otomatis berhak mengubah invoice atau memverifikasi pembayaran.
+   - **Receptionist / Kasir**: Hanya melihat ringkasan status inspeksi untuk operasional serah terima kunci. Tidak dapat mengedit checklist atau menyetujui laporan atas nama penyewa.
+   - **Tenant / Penyewa**: Hanya melihat inspeksi kamar miliknya. Berhak menyetujui (`approve`) atau mengajukan keberatan (`object`) sebelum tenggat `tenant_due_at`. Penyewa tidak dapat mengubah checklist, foto, atau laporan yang dibuat petugas.
+7. **Audit Trail**:
+   Aksi kritis seperti verifikasi pembayaran (`verified_by`, `verified_at`, `verification_notes`), penolakan bukti (`rejection_reason`), pembatalan booking, perubahan harga kamar, persetujuan pengeluaran, serta setiap tahapan inspeksi (`inspection_logs`) dicatat dengan cap `user_id` dan `timestamp`.

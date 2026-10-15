@@ -154,3 +154,44 @@ stateDiagram-v2
 4. **Larangan Verifikasi Sendiri**:
    - Penyewa tidak memiliki akses otorisasi untuk memverifikasi pembayarannya sendiri, bahkan jika memanipulasi request API. Petugas verifikasi wajib berwenang pada cabang properti tersebut.
 
+---
+
+## 5. Alur Kerja Inspeksi Kondisi Kamar & Serah Terima (Tahap 3)
+
+```mermaid
+stateDiagram-v2
+    [*] --> Scheduled: Pengelola buat jadwal inspeksi
+    Scheduled --> InProgress: Staf mulai inspeksi kamar
+    
+    state InspectionExecution {
+        InProgress --> ChecklistFilled: Isi kondisi tiap item fasilitas
+        ChecklistFilled --> PhotoUploaded: Unggah foto bukti fisik kamar
+        PhotoUploaded --> Completed: Staf simpulkan kondisi & selesaikan
+    }
+
+    Completed --> TenantReview: Diteruskan ke penyewa (Batas konfirmasi 3 hari)
+    
+    state TenantDecision {
+        TenantReview --> ApprovedByTenant: Penyewa menyetujui checklist
+        TenantReview --> ObjectedByTenant: Penyewa ajukan catatan keberatan
+    }
+
+    ObjectedByTenant --> Reinspection: Pengelola verifikasi & jadwalkan ulang
+    ApprovedByTenant --> Finalized: Hasil sah mengikat kedua pihak
+```
+
+### Aturan Bisnis & Kebijakan Inspeksi:
+1. **Inspeksi Tidak Otomatis Mengaktifkan Booking**:
+   - Keberadaan laporan inspeksi kamar (`check_in`) yang telah disetujui TIDAK otomatis mengubah status booking menjadi `active`.
+   - Aktivasi masa sewa tetap tunduk pada aturan pembayaran Tahap 2: bukti pembayaran uang sewa dan deposit wajib berstatus `VERIFIED` oleh pengelola.
+2. **Pemberian Checklist Awal Otomatis (Baseline)**:
+   - Saat jadwal inspeksi dibuat, sistem otomatis menyalin daftar aset fisik kamar (`room_assets`) atau menggunakan 8 item standar jika aset belum didaftarkan.
+   - Setiap butir checklist mencatat kondisi: `good`, `fair`, `poor`, `damaged`, atau `missing`.
+3. **Komparasi Check-Out vs Check-In**:
+   - Saat penyewa akan keluar (`check_out`), inspeksi akhir wajib dikaitkan dengan `baseline_inspection_id` (inspeksi check-in awal).
+   - Sistem menghitung gradasi kerusakan secara otomatis: jika item mengalami degradasi (e.g. `good` menjadi `damaged` atau `missing`), sistem menghitung estimasi biaya kerusakan (`total_damage_cost`).
+   - Biaya kerusakan ini dijadikan dasar perhitungan pemotongan uang deposit sewa penyewa sebelum pengembalian dana akhir.
+4. **Batas Waktu dan Hak Keberatan Penyewa**:
+   - Penyewa memiliki jendela konfirmasi (default: 3 hari sejak status `completed`).
+   - Jika ada ketidaksesuaian fasilitas, penyewa mengajukan catatan keberatan melalui aplikasi mobile atau web dashboard. Staf/manajer kemudian memeriksa ulang dan merevisi butir terkait dengan riwayat audit trail yang tercatat utuh.
+

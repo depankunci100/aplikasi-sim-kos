@@ -30,8 +30,15 @@ erDiagram
 
     BOOKINGS ||--o{ INVOICES : "menghasilkan tagihan"
     BOOKINGS ||--o{ UTILITY_READINGS : "beban meteran"
+    BOOKINGS ||--o{ INSPECTIONS : "memiliki serah terima"
 
     INVOICES ||--o{ PAYMENTS : "dilunasi dengan"
+
+    PROPERTIES ||--o{ INSPECTIONS : "memiliki riwayat inspeksi"
+    ROOMS ||--o{ INSPECTIONS : "diinspeksi"
+    INSPECTIONS ||--o{ INSPECTION_ITEMS : "memiliki checklist item"
+    INSPECTIONS ||--o{ INSPECTION_MEDIA : "memiliki bukti foto"
+    INSPECTIONS ||--o{ INSPECTION_LOGS : "memiliki jejak audit"
 
     USERS {
         bigint id PK
@@ -296,6 +303,57 @@ erDiagram
   - `FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE`
   - `FOREIGN KEY (user_id) REFERENCES users(id)`
   - `FOREIGN KEY (verified_by) REFERENCES users(id)`
+
+### Tabel: `room_assets`
+- **Fungsi**: Master inventaris dan aset bawaan fisik di dalam kamar (e.g. AC, kasur, lemari, kunci, water heater).
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (room_id, asset_name)`
+  - `FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE`
+
+### Tabel: `inspections`
+- **Fungsi**: Entitas utama inspeksi berkala, serah terima check-in, dan pemeriksaan check-out keluar kamar.
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `UNIQUE (inspection_code)`
+  - `INDEX (property_id, status, scheduled_date)`
+  - `INDEX (room_id, type)`
+  - `INDEX (booking_id)`
+  - `INDEX (inspector_id)`
+  - `INDEX (tenant_id)`
+  - `FOREIGN KEY (property_id) REFERENCES properties(id)`
+  - `FOREIGN KEY (room_id) REFERENCES rooms(id)`
+  - `FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL`
+  - `FOREIGN KEY (inspector_id) REFERENCES users(id)`
+  - `FOREIGN KEY (tenant_id) REFERENCES users(id)`
+  - `FOREIGN KEY (baseline_inspection_id) REFERENCES inspections(id) ON DELETE SET NULL`
+
+### Tabel: `inspection_items`
+- **Fungsi**: Rincian butir checklist fasilitas, kondisi fisik saat inspeksi, catatan khusus, status perbaikan, dan estimasi biaya perbaikan.
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (inspection_id, condition)`
+  - `INDEX (room_asset_id)`
+  - `FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (room_asset_id) REFERENCES room_assets(id) ON DELETE SET NULL`
+
+### Tabel: `inspection_media`
+- **Fungsi**: Rekam foto bukti visual saat inspeksi dilakukan (disimpan privat, dilayani via streaming controller terotentikasi).
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (inspection_id)`
+  - `INDEX (inspection_item_id)`
+  - `FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (inspection_item_id) REFERENCES inspection_items(id) ON DELETE SET NULL`
+
+### Tabel: `inspection_logs`
+- **Fungsi**: Audit trail permanen yang mencatat setiap aksi inspeksi (dibuat, dimulai, item diupdate, foto diupload, diselesaikan, disetujui penyewa, atau diajukan keberatan).
+- **Index**:
+  - `PRIMARY KEY (id)`
+  - `INDEX (inspection_id, action)`
+  - `INDEX (user_id)`
+  - `FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE`
+  - `FOREIGN KEY (user_id) REFERENCES users(id)`
 
 ---
 

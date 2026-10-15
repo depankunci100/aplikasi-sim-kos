@@ -6,6 +6,10 @@ import '../features/invoices/models/invoice_model.dart';
 import '../features/invoices/screens/invoice_detail_screen.dart';
 import '../features/invoices/screens/invoices_screen.dart';
 import '../features/invoices/screens/payment_submit_screen.dart';
+import '../features/inspections/models/inspection_model.dart';
+import '../features/inspections/screens/inspections_screen.dart';
+import '../features/inspections/screens/inspection_detail_screen.dart';
+import '../features/inspections/screens/inspection_compare_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
 import '../features/properties/models/property_model.dart';
 import '../features/properties/screens/home_screen.dart';
@@ -28,6 +32,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/invoices',
         builder: (context, state) => const InvoicesScreen(),
+      ),
+      GoRoute(
+        path: '/inspections',
+        builder: (context, state) => const InspectionsScreen(),
+      ),
+      GoRoute(
+        path: '/inspection/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final inspection = state.extra as InspectionModel?;
+          return InspectionDetailScreen(inspectionId: id, initialInspection: inspection);
+        },
+      ),
+      GoRoute(
+        path: '/inspection/:id/compare/:baselineId',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final baselineId = int.tryParse(state.pathParameters['baselineId'] ?? '1') ?? 1;
+          return InspectionCompareScreen(currentId: id, baselineId: baselineId);
+        },
       ),
       GoRoute(
         path: '/invoice/:id',

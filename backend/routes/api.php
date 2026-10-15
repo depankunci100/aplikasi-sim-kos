@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
+use App\Http\Controllers\Api\V1\InspectionController;
 use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PropertyController;
@@ -47,5 +48,18 @@ Route::prefix('v1')->group(function () {
             Route::post('/payments/{id}/verify', [PaymentController::class, 'verify']);
             Route::post('/payments/{id}/reject', [PaymentController::class, 'reject']);
         });
+
+        // Room Inspections & Checklist (All Authenticated Users with proper policies)
+        Route::get('/inspections', [InspectionController::class, 'index']);
+        Route::post('/inspections', [InspectionController::class, 'store']);
+        Route::get('/inspections/{id}', [InspectionController::class, 'show']);
+        Route::post('/inspections/{id}/start', [InspectionController::class, 'start']);
+        Route::put('/inspections/{id}/items/{itemId}', [InspectionController::class, 'updateItem']);
+        Route::post('/inspections/{id}/media', [InspectionController::class, 'uploadMedia']);
+        Route::get('/inspections/{id}/media/{mediaId}', [InspectionController::class, 'streamMedia']);
+        Route::post('/inspections/{id}/complete', [InspectionController::class, 'complete']);
+        Route::post('/inspections/{id}/approve', [InspectionController::class, 'approve']);
+        Route::post('/inspections/{id}/object', [InspectionController::class, 'object']);
+        Route::get('/inspections/{id}/compare/{baselineId}', [InspectionController::class, 'compare']);
     });
 });

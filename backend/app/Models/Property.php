@@ -53,4 +53,9 @@ class Property extends Model
     {
         return $this->hasMany(Booking::class);
     }
+
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(Inspection::class);
+    }
 }
