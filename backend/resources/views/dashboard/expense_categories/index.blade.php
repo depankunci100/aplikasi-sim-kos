@@ -16,7 +16,7 @@
     </div>
     <div class="d-flex gap-2">
         @if(auth()->user()->isSuperAdmin() || auth()->user()->isOwner() || auth()->user()->isManager())
-        <button type="button" class="btn btn-primary-teal btn-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalAddCategory">
+        <button type="button" class="btn btn-primary-teal btn-sm d-flex align-items-center gap-1" data-bs-toggle="offcanvas" data-bs-target="#createCategoryDrawer" aria-controls="createCategoryDrawer">
             <i class="bi bi-plus-circle"></i> Tambah Kategori
         </button>
         @endif
@@ -83,46 +83,55 @@
     </div>
 </div>
 
-<!-- Modal Add Category -->
-<div class="modal fade" id="modalAddCategory" tabindex="-1">
-    <div class="modal-dialog">
-        <form action="{{ route('dashboard.expenses.categories.store') }}" method="POST">
-            @csrf
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Tambah Kategori Pengeluaran</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Nama Kategori <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" placeholder="Contoh: Pembelian Gas & Galon" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Kode Unik Sistem (huruf kecil & garis bawah) <span class="text-danger">*</span></label>
-                        <input type="text" name="code" class="form-control" placeholder="Contoh: gas_galon" required pattern="^[a-z0-9_]+$">
-                        <small class="text-muted">Hanya karakter huruf kecil, angka, dan underscore.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Cabang Properti (Opsional)</label>
-                        <select name="property_id" class="form-select">
-                            <option value="">Global (Berlaku untuk semua properti)</option>
-                            @foreach($properties as $prop)
-                                <option value="{{ $prop->id }}">{{ $prop->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Deskripsi</label>
-                        <textarea name="description" class="form-control" rows="2" placeholder="Keterangan pos pengeluaran ini..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary-teal btn-sm px-3">Simpan Kategori</button>
-                </div>
-            </div>
-        </form>
+<!-- Right-Side Drawer (Slide-in Panel): Tambah Kategori Pengeluaran -->
+<div class="offcanvas offcanvas-end drawer-md" tabindex="-1" id="createCategoryDrawer" aria-labelledby="createCategoryDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2" id="createCategoryDrawerLabel">
+            <i class="bi bi-tags text-primary-teal"></i> Tambah Kategori Pengeluaran
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
     </div>
+    <form action="{{ route('dashboard.expenses.categories.store') }}" method="POST" class="d-flex flex-column h-100">
+        @csrf
+        <input type="hidden" name="_drawer_id" value="createCategoryDrawer">
+
+        <div class="offcanvas-body">
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Nama Kategori <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="form-control form-control-sm @error('name') is-invalid @enderror"
+                       placeholder="Contoh: Pembelian Gas & Galon" value="{{ old('name') }}" required>
+                @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Kode Unik Sistem (huruf kecil & garis bawah) <span class="text-danger">*</span></label>
+                <input type="text" name="code" class="form-control form-control-sm @error('code') is-invalid @enderror"
+                       placeholder="Contoh: gas_galon" value="{{ old('code') }}" required pattern="^[a-z0-9_]+$">
+                <div class="form-text small">Hanya karakter huruf kecil, angka, dan underscore.</div>
+                @error('code') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Cabang Properti (Opsional)</label>
+                <select name="property_id" class="form-select form-select-sm @error('property_id') is-invalid @enderror">
+                    <option value="">Global (Berlaku untuk semua properti)</option>
+                    @foreach($properties as $prop)
+                        <option value="{{ $prop->id }}" {{ old('property_id') == $prop->id ? 'selected' : '' }}>{{ $prop->name }}</option>
+                    @endforeach
+                </select>
+                @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Deskripsi</label>
+                <textarea name="description" class="form-control form-control-sm @error('description') is-invalid @enderror"
+                          rows="3" placeholder="Keterangan pos pengeluaran ini...">{{ old('description') }}</textarea>
+                @error('description') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            </div>
+        </div>
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">Batal</button>
+            <button type="submit" class="btn btn-primary-teal btn-sm px-3">
+                <i class="bi bi-save me-1"></i>Simpan Kategori
+            </button>
+        </div>
+    </form>
 </div>
 @endsection

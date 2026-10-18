@@ -25,6 +25,12 @@ class Property extends Model
         'rules',
         'facilities',
         'is_active',
+        'dp_required',
+        'dp_type',
+        'dp_amount',
+        'dp_percentage',
+        'payment_deadline_hours',
+        'deposit_amount',
     ];
 
     protected $casts = [
@@ -32,7 +38,28 @@ class Property extends Model
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
         'is_active' => 'boolean',
+        'dp_required' => 'boolean',
+        'dp_amount' => 'decimal:2',
+        'dp_percentage' => 'decimal:2',
+        'payment_deadline_hours' => 'integer',
+        'deposit_amount' => 'decimal:2',
     ];
+
+    public function calculateDownPayment(float $rateAmount, float $depositAmount = 0.0): float
+    {
+        if (!$this->dp_required) {
+            return 0.0;
+        }
+
+        $total = $rateAmount + $depositAmount;
+        if ($this->dp_type === 'percentage') {
+            $percentage = (float) ($this->dp_percentage ?? 0);
+            return round(($total * $percentage) / 100, 2);
+        }
+
+        $fixed = (float) ($this->dp_amount ?? 0);
+        return min($fixed, $total);
+    }
 
     public function users(): BelongsToMany
     {
@@ -52,6 +79,16 @@ class Property extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function depositLedgers(): HasMany
+    {
+        return $this->hasMany(DepositLedger::class);
+    }
+
+    public function settlements(): HasMany
+    {
+        return $this->hasMany(CheckOutSettlement::class);
     }
 
     public function inspections(): HasMany
@@ -99,8 +136,19 @@ class Property extends Model
         return $this->hasMany(ExpenseCategory::class);
     }
 
+    public function accounts(): HasMany
+    {
+        return $this->hasMany(Account::class);
+    }
+
+    public function journalEntries(): HasMany
+    {
+        return $this->hasMany(JournalEntry::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('properties.is_active', true);
     }
 }
+

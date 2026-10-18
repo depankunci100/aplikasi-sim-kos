@@ -546,4 +546,51 @@ class FinancialReportService
             'expense_categories' => $expenseCategories,
         ];
     }
+
+    /**
+     * 7. Security Deposit Subledger Summary (Kewajiban Uang Jaminan)
+     */
+    public function getDepositSummary(User $user, array $filters = []): array
+    {
+        $propertyIds = $this->getAuthorizedPropertyIds($user, $filters['property_id'] ?? null);
+
+        $startDate = !empty($filters['start_date']) ? Carbon::parse($filters['start_date'])->startOfDay() : now()->startOfMonth();
+        $endDate = !empty($filters['end_date']) ? Carbon::parse($filters['end_date'])->endOfDay() : now()->endOfMonth();
+
+        // 1. Total kewajiban deposit aktif saat ini (Liability balance held)
+        $totalDepositHeld = (float) \App\Models\DepositLedger::whereIn('property_id', $propertyIds)
+            ->where('status', \App\Enums\DepositStatus::HELD)
+            ->sum('current_balance');
+
+        // 2. Penerimaan deposit dalam periode
+        $depositsReceivedPeriod = (float) \App\Models\DepositMutation::whereHas('ledger', function ($q) use ($propertyIds) {
+                $q->whereIn('property_id', $propertyIds);
+            })
+            ->where('transaction_type', \App\Enums\DepositMutationType::DEPOSIT_RECEIVED)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum('amount');
+
+        // 3. Potongan denda kerusakan dalam periode
+        $deductionsPeriod = (float) \App\Models\DepositMutation::whereHas('ledger', function ($q) use ($propertyIds) {
+                $q->whereIn('property_id', $propertyIds);
+            })
+            ->where('transaction_type', \App\Enums\DepositMutationType::DAMAGE_DEDUCTION)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum('amount');
+
+        // 4. Pengembalian deposit yang dibayarkan dalam periode
+        $refundsPaidPeriod = (float) \App\Models\DepositMutation::whereHas('ledger', function ($q) use ($propertyIds) {
+                $q->whereIn('property_id', $propertyIds);
+            })
+            ->where('transaction_type', \App\Enums\DepositMutationType::REFUND_PAYOUT)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum('amount');
+
+        return [
+            'total_deposit_held' => round($totalDepositHeld, 2),
+            'deposits_received_period' => round($depositsReceivedPeriod, 2),
+            'deductions_period' => round($deductionsPeriod, 2),
+            'refunds_paid_period' => round($refundsPaidPeriod, 2),
+        ];
+    }
 }

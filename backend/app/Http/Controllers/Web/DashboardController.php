@@ -11,6 +11,8 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Property;
 use App\Models\Room;
+use App\Services\Dashboard\CalendarOccupancyService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +20,10 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        protected CalendarOccupancyService $calendarOccupancyService
+    ) {}
+
     public function index(Request $request): View
     {
         $user = Auth::user();
@@ -104,6 +110,14 @@ class DashboardController extends Controller
 
         $propertiesList = (clone $propertyQuery)->get(['id', 'name', 'code']);
 
+        // Kalender Okupansi & Slot Kamar
+        $calendarMonth = $request->query('month');
+        $calendarData = $this->calendarOccupancyService->getMonthlyOccupancy(
+            $user,
+            $propertyFilter ? (int) $propertyFilter : null,
+            $calendarMonth
+        );
+
         return view('dashboard.index', compact(
             'user',
             'roomStats',
@@ -112,7 +126,26 @@ class DashboardController extends Controller
             'recentBookings',
             'rooms',
             'propertiesList',
-            'propertyFilter'
+            'propertyFilter',
+            'calendarData',
+            'calendarMonth'
         ));
+    }
+
+    /**
+     * AJAX endpoint untuk navigasi bulan kalender okupansi tanpa reload halaman penuh
+     */
+    public function calendarData(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        $propertyId = $request->query('property_id') ? (int) $request->query('property_id') : null;
+        $month = $request->query('month');
+
+        $data = $this->calendarOccupancyService->getMonthlyOccupancy($user, $propertyId, $month);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
     }
 }

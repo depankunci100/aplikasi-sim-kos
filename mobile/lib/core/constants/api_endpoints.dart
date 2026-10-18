@@ -30,7 +30,7 @@ class ApiEndpoints {
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api/v1';
+      return 'http://192.168.1.12:8000/api/v1';
     }
 
     return 'http://127.0.0.1:8000/api/v1';
@@ -64,4 +64,35 @@ class ApiEndpoints {
   static const String reportsCashFlow = '/finance/reports/cash-flow';
   static const String reportsReceivables = '/finance/reports/receivables';
   static const String reportsOperatingSummary = '/finance/reports/operating-summary';
+
+  // Security Deposit Subledger & Check-Out Settlements (Phase 7)
+  static const String deposits = '/deposits';
+  static const String settlements = '/settlements';
+  static String depositDetail(int id) => '/deposits/$id';
+  static String settlementDetail(int id) => '/settlements/$id';
+  static String settlementTenantDecision(int id) => '/settlements/$id/tenant-decision';
+  static String settlementResolve(int id) => '/settlements/$id/resolve';
+  static String settlementFinalize(int id) => '/settlements/$id/finalize';
+
+  // Phase 8: Accounting, Double-Entry Journal & Reconciliation
+  static const String accountingCoa = '/finance/accounting/coa';
+  static const String accountingJournals = '/finance/accounting/journals';
+  static String accountingJournalDetail(int id) => '/finance/accounting/journals/$id';
+  static String accountingJournalReverse(int id) => '/finance/accounting/journals/$id/reverse';
+  static const String accountingTrialBalance = '/finance/accounting/reports/trial-balance';
+  static const String accountingIncomeStatement = '/finance/accounting/reports/income-statement';
+  static const String accountingBalanceSheet = '/finance/accounting/reports/balance-sheet';
+  static const String accountingReconciliation = '/finance/accounting/reports/reconciliation';
+
+  // Public Booking & Availability
+  static const String publicProperties = '/public/properties';
+  static const String publicAvailability = '/public/rooms/availability';
+  static const String publicCalculatePrice = '/public/bookings/calculate-price';
+  static const String publicBookings = '/public/bookings';
+  static String publicTrackBooking(String token) => '/public/bookings/track/$token';
+
+  // Fixed Assets & Room Inventory
+  static const String assets = '/assets';
+  static String assetDetail(int id) => '/assets/$id';
+  static String assetReportIssue(int id) => '/assets/$id/report-issue';
 }

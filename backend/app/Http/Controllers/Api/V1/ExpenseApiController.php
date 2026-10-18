@@ -278,7 +278,16 @@ class ExpenseApiController extends ApiController
             return $this->errorResponse('File bukti kuitansi tidak ditemukan.', 404);
         }
 
-        return response()->file(Storage::path($expense->receipt_photo));
+        $fullPath = Storage::path($expense->receipt_photo);
+        $mimeType = Storage::mimeType($expense->receipt_photo) ?? 'image/jpeg';
+
+        $fileResponse = response()->file($fullPath, [
+            'Content-Type' => $mimeType,
+        ]);
+        $fileResponse->setPrivate();
+        $fileResponse->headers->addCacheControlDirective('no-cache', true);
+
+        return $fileResponse;
     }
 
     protected function canAccessExpense($user, Expense $expense): bool

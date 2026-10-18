@@ -259,25 +259,47 @@
 </div>
 
 <!-- Modal Approve -->
-<div class="modal fade" id="modalApprove" tabindex="-1">
-    <div class="modal-dialog">
-        <form action="{{ route('dashboard.expenses.approve', $expense->id) }}" method="POST">
+<div class="modal fade modal-confirm" id="modalApprove" tabindex="-1" aria-labelledby="modalApproveLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="{{ route('dashboard.expenses.approve', $expense->id) }}" method="POST" class="w-100">
             @csrf
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Setujui Pengeluaran Operasional</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header d-flex align-items-center">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="modalApproveLabel">
+                        <i class="bi bi-check-circle-fill text-success fs-5"></i> Setujui Pengeluaran
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Apakah Anda yakin menyetujui pengeluaran <strong>{{ $expense->expense_number }}</strong> senilai <strong>Rp {{ number_format($expense->amount, 0, ',', '.') }}</strong>?</p>
-                    <div class="mb-3">
+                    <p class="text-muted small mb-3">Harap pastikan data pengeluaran berikut telah diverifikasi kebenarannya sebelum memberikan persetujuan:</p>
+                    <div class="p-3 bg-light rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">No. Pengeluaran:</span>
+                            <span class="fw-bold font-monospace text-dark">{{ $expense->expense_number }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">Cabang Properti:</span>
+                            <span class="fw-semibold text-dark">{{ $expense->property->name ?? '-' }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">Vendor / Penerima:</span>
+                            <span class="text-dark">{{ $expense->vendor_name ?: '-' }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between border-top pt-2 mt-2">
+                            <span class="text-muted small fw-bold">Nominal Pengeluaran:</span>
+                            <span class="fs-5 fw-bold text-success">Rp {{ number_format($expense->amount, 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
                         <label class="form-label small fw-semibold">Catatan Persetujuan (Opsional)</label>
-                        <textarea name="notes" class="form-control" rows="3" placeholder="Contoh: Disetujui sesuai anggaran operasional bulanan..."></textarea>
+                        <textarea name="notes" class="form-control form-control-sm" rows="3" placeholder="Contoh: Disetujui sesuai pagu anggaran operasional bulanan..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success btn-sm px-3">Setujui Pengeluaran</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success btn-sm px-3">
+                        <i class="bi bi-check2 me-1"></i>Setujui Pengeluaran
+                    </button>
                 </div>
             </div>
         </form>
@@ -285,25 +307,31 @@
 </div>
 
 <!-- Modal Reject -->
-<div class="modal fade" id="modalReject" tabindex="-1">
-    <div class="modal-dialog">
-        <form action="{{ route('dashboard.expenses.reject', $expense->id) }}" method="POST">
+<div class="modal fade modal-confirm" id="modalReject" tabindex="-1" aria-labelledby="modalRejectLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="{{ route('dashboard.expenses.reject', $expense->id) }}" method="POST" class="w-100">
             @csrf
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-danger">Tolak Pengeluaran Operasional</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header d-flex align-items-center">
+                    <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="modalRejectLabel">
+                        <i class="bi bi-x-circle-fill text-danger fs-5"></i> Tolak Pengeluaran Operasional
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Tolak pengajuan pengeluaran <strong>{{ $expense->expense_number }}</strong>. Harap cantumkan alasan penolakan secara jelas:</p>
+                    <p class="text-muted small mb-3">Tolak pengajuan pengeluaran <strong>{{ $expense->expense_number }}</strong> senilai <strong>Rp {{ number_format($expense->amount, 0, ',', '.') }}</strong>. Harap cantumkan alasan penolakan secara jelas:</p>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Alasan Penolakan <span class="text-danger">*</span></label>
-                        <textarea name="rejection_reason" class="form-control" rows="3" required placeholder="Contoh: Nota tidak jelas, atau nominal melebihi plafon anggaran..."></textarea>
+                        <textarea name="rejection_reason" class="form-control form-control-sm @error('rejection_reason') is-invalid @enderror"
+                                  rows="3" required placeholder="Contoh: Bukti kuitansi buram atau nominal melebihi anggaran cabang..."></textarea>
+                        @error('rejection_reason') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-danger btn-sm px-3">Tolak Pengajuan</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-3">
+                        <i class="bi bi-x-circle me-1"></i>Tolak Pengajuan
+                    </button>
                 </div>
             </div>
         </form>
@@ -311,55 +339,78 @@
 </div>
 
 <!-- Modal Record Payment -->
-<div class="modal fade" id="modalRecordPayment" tabindex="-1">
-    <div class="modal-dialog">
-        <form action="{{ route('dashboard.expenses.pay', $expense->id) }}" method="POST" enctype="multipart/form-data">
+<div class="modal fade modal-confirm" id="modalRecordPayment" tabindex="-1" aria-labelledby="modalRecordPaymentLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="{{ route('dashboard.expenses.pay', $expense->id) }}" method="POST" enctype="multipart/form-data" class="w-100">
             @csrf
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Catat Pembayaran Realisasi</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header d-flex align-items-center">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="modalRecordPaymentLabel">
+                        <i class="bi bi-cash-stack text-primary-teal fs-5"></i> Catat Realisasi Pembayaran
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="alert alert-info py-2 small mb-3">
-                        Sisa tagihan pengeluaran: <strong>Rp {{ number_format($expense->remaining_balance, 0, ',', '.') }}</strong>
+                    <div class="p-3 bg-light rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">Total Tagihan:</span>
+                            <span class="fw-semibold text-dark">Rp {{ number_format($expense->amount, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">Sudah Dibayar:</span>
+                            <span class="text-success fw-semibold">Rp {{ number_format($expense->paid_amount, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between border-top pt-2 mt-2">
+                            <span class="text-muted small fw-bold">Sisa Pembayaran:</span>
+                            <span class="fs-5 fw-bold text-danger">Rp {{ number_format($expense->remaining_balance, 0, ',', '.') }}</span>
+                        </div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Nominal Pembayaran (Rp) <span class="text-danger">*</span></label>
                         <input type="number" step="0.01" min="1" max="{{ $expense->remaining_balance }}" name="amount"
-                               class="form-control" value="{{ $expense->remaining_balance }}" required>
-                        <small class="text-muted">Dapat berupa pelunasan penuh atau sebagian (parsial).</small>
+                               class="form-control form-control-sm @error('amount') is-invalid @enderror" value="{{ $expense->remaining_balance }}" required>
+                        <div class="form-text small">Dapat berupa pelunasan penuh atau sebagian (pembayaran parsial).</div>
+                        @error('amount') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Tanggal Pembayaran <span class="text-danger">*</span></label>
-                        <input type="date" name="payment_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                        <input type="date" name="payment_date" class="form-control form-control-sm @error('payment_date') is-invalid @enderror"
+                               value="{{ date('Y-m-d') }}" required>
+                        @error('payment_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Metode Pembayaran <span class="text-danger">*</span></label>
-                        <select name="payment_method" class="form-select" required>
+                        <select name="payment_method" class="form-select form-select-sm @error('payment_method') is-invalid @enderror" required>
                             <option value="cash">Tunai / Kas Kecil (Petty Cash)</option>
                             <option value="bank_transfer">Transfer Bank</option>
                             <option value="qris">QRIS / E-Wallet</option>
                             <option value="other">Lainnya</option>
                         </select>
+                        @error('payment_method') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Bukti Pembayaran / Slip Transfer (Opsional)</label>
-                        <input type="file" name="proof_file" class="form-control" accept="image/jpeg,image/png,image/webp,application/pdf">
+                        <input type="file" name="proof_file" class="form-control form-control-sm @error('proof_file') is-invalid @enderror"
+                               accept="image/jpeg,image/png,image/webp,application/pdf">
+                        @error('proof_file') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-2">
                         <label class="form-label small fw-semibold">Catatan</label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="Keterangan tambahan..."></textarea>
+                        <textarea name="notes" class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                                  rows="2" placeholder="Keterangan tambahan..."></textarea>
+                        @error('notes') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary-teal btn-sm px-3">Simpan Pembayaran</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary-teal btn-sm px-3">
+                        <i class="bi bi-save me-1"></i>Simpan Pembayaran
+                    </button>
                 </div>
             </div>
         </form>

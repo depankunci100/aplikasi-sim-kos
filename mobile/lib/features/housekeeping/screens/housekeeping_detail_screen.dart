@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/housekeeping_model.dart';
 import '../providers/housekeeping_provider.dart';
 
@@ -78,6 +79,9 @@ class _HousekeepingDetailScreenState extends ConsumerState<HousekeepingDetailScr
   }
 
   Widget _buildContent(BuildContext context, HousekeepingTaskModel item) {
+    final authState = ref.watch(authProvider);
+    final isTenant = authState.user == null || authState.user!.isTenant;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -230,15 +234,70 @@ class _HousekeepingDetailScreenState extends ConsumerState<HousekeepingDetailScr
             ),
 
           if (item.status == 'pending_verification')
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _showVerifyDialog(context, item.id),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 12)),
-                icon: const Icon(Icons.verified_outlined, color: Colors.white),
-                label: const Text('Verifikasi Hasil Kebersihan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            if (isTenant) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, color: Color(0xFF2563EB), size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Staf telah menyelesaikan pembersihan. Mohon periksa kondisi kamar Anda dan konfirmasi apakah sudah sesuai atau memerlukan perbaikan.',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showRevisionDialog(context, item),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626),
+                        side: const BorderSide(color: Color(0xFFDC2626)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.assignment_late_outlined, size: 18),
+                      label: const Text('Minta Perbaikan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showApproveDialog(context, item),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text('Konfirmasi Selesai', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
+            ] else
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showVerifyDialog(context, item.id),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  icon: const Icon(Icons.verified_outlined, color: Colors.white),
+                  label: const Text('Verifikasi Hasil Kebersihan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
         ],
       ),
     );
@@ -297,6 +356,166 @@ class _HousekeepingDetailScreenState extends ConsumerState<HousekeepingDetailScr
             child: const Text('Verifikasi'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showApproveDialog(BuildContext context, HousekeepingTaskModel item) {
+    final feedbackController = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Color(0xFF0D9488)),
+            SizedBox(width: 8),
+            Text('Konfirmasi Selesai'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Apakah Anda sudah puas dengan kebersihan kamar? Tugas akan ditandai selesai.',
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: feedbackController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Catatan / Masukan (Opsional)',
+                hintText: 'Misal: Kamar bersih dan wangi',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await ref.read(housekeepingServiceProvider).approveTask(
+                    item.id,
+                    feedback: feedbackController.text.trim().isNotEmpty ? feedbackController.text.trim() : null,
+                  );
+              if (mounted && ok) {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Terima kasih! Kebersihan kamar telah dikonfirmasi selesai.')),
+                );
+              }
+            },
+            child: const Text('Konfirmasi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRevisionDialog(BuildContext context, HousekeepingTaskModel item) {
+    final reasonController = TextEditingController();
+    final selectedItems = <String>{};
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.assignment_late_outlined, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Minta Perbaikan'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Pilih bagian yang perlu dibersihkan ulang:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  if (item.checklist.isNotEmpty)
+                    ...item.checklist.map((c) {
+                      final isChecked = selectedItems.contains(c.task);
+                      return CheckboxListTile(
+                        dense: true,
+                        title: Text(c.task, style: const TextStyle(fontSize: 13)),
+                        value: isChecked,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            if (val == true) {
+                              selectedItems.add(c.task);
+                            } else {
+                              selectedItems.remove(c.task);
+                            }
+                          });
+                        },
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    })
+                  else
+                    const Text('Tidak ada rincian checklist.', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Catatan Perbaikan *',
+                      hintText: 'Jelaskan apa yang belum sesuai dan perlu dibersihkan kembali...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final reason = reasonController.text.trim();
+                  if (reason.isEmpty) {
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Catatan perbaikan wajib diisi.')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(ctx);
+                  final ok = await ref.read(housekeepingServiceProvider).requestRevision(
+                        item.id,
+                        reason: reason,
+                        problematicItems: selectedItems.isNotEmpty ? selectedItems.toList() : null,
+                      );
+                  if (mounted && ok) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Permintaan perbaikan kebersihan telah dikirimkan ke petugas & pengelola.'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Kirim'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

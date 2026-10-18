@@ -46,6 +46,12 @@ class MaintenanceRequest extends Model
         'photos_after',
         'sla_due_at',
         'is_overdue',
+        'asset_id',
+        'is_capitalized',
+        'capitalized_amount',
+        'capitalized_at',
+        'capitalized_by',
+        'expense_id',
     ];
 
     protected $casts = [
@@ -57,10 +63,13 @@ class MaintenanceRequest extends Model
         'completed_at' => 'datetime',
         'verified_at' => 'datetime',
         'sla_due_at' => 'datetime',
+        'capitalized_at' => 'datetime',
         'spare_parts' => 'array',
         'photos_before' => 'array',
         'photos_after' => 'array',
         'is_overdue' => 'boolean',
+        'is_capitalized' => 'boolean',
+        'capitalized_amount' => 'decimal:2',
         'labor_cost' => 'decimal:2',
         'material_cost' => 'decimal:2',
         'total_cost' => 'decimal:2',
@@ -79,6 +88,16 @@ class MaintenanceRequest extends Model
     public function roomAsset(): BelongsTo
     {
         return $this->belongsTo(RoomAsset::class);
+    }
+
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class);
+    }
+
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class);
     }
 
     public function complaint(): BelongsTo

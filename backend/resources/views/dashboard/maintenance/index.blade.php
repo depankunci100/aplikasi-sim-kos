@@ -8,10 +8,10 @@
         <h3 class="fw-bold mb-1"><i class="bi bi-tools text-primary-teal me-2"></i>Tiket Perbaikan & Maintenance</h3>
         <p class="text-muted mb-0">Kelola dan pantau pengerjaan perbaikan fasilitas, kerusakan kamar, dan area bersama.</p>
     </div>
-    <a href="{{ route('dashboard.maintenance.create') }}" class="btn btn-primary-teal d-flex align-items-center gap-2">
+    <button type="button" class="btn btn-primary-teal d-flex align-items-center gap-2" data-bs-toggle="offcanvas" data-bs-target="#createMaintenanceDrawer" aria-controls="createMaintenanceDrawer">
         <i class="bi bi-plus-circle"></i>
         <span>Ajukan Perbaikan</span>
-    </a>
+    </button>
 </div>
 
 <!-- KPI Summary Cards -->
@@ -250,4 +250,125 @@
     </div>
     @endif
 </div>
+
+<!-- Right-Side Drawer: Ajukan Tiket Perbaikan -->
+<div class="offcanvas offcanvas-end drawer-lg" tabindex="-1" id="createMaintenanceDrawer" aria-labelledby="createMaintenanceDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2" id="createMaintenanceDrawerLabel">
+            <i class="bi bi-tools text-primary-teal"></i> Ajukan Tiket Perbaikan
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+    </div>
+    <form action="{{ route('dashboard.maintenance.store') }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column h-100">
+        @csrf
+        <input type="hidden" name="_drawer_id" value="createMaintenanceDrawer">
+
+        <div class="offcanvas-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Properti <span class="text-danger">*</span></label>
+                    <select name="property_id" id="drawerMaintenancePropertySelect" class="form-select form-select-sm @error('property_id') is-invalid @enderror" required>
+                        <option value="">-- Pilih Properti --</option>
+                        @foreach($properties as $prop)
+                            <option value="{{ $prop->id }}" {{ old('property_id') == $prop->id ? 'selected' : '' }} data-rooms='@json($prop->rooms)'>
+                                {{ $prop->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Kamar (Opsional)</label>
+                    <select name="room_id" id="drawerMaintenanceRoomSelect" class="form-select form-select-sm @error('room_id') is-invalid @enderror">
+                        <option value="">Area Bersama / Seluruh Properti</option>
+                    </select>
+                    <div class="form-text small">Biarkan kosong jika kerusakan pada area umum.</div>
+                    @error('room_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Kategori Kerusakan <span class="text-danger">*</span></label>
+                    <select name="category" class="form-select form-select-sm @error('category') is-invalid @enderror" required>
+                        @foreach(\App\Enums\MaintenanceCategory::cases() as $cat)
+                            <option value="{{ $cat->value }}" {{ old('category') == $cat->value ? 'selected' : '' }}>
+                                {{ $cat->label() }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('category') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Tingkat Prioritas <span class="text-danger">*</span></label>
+                    <select name="priority" class="form-select form-select-sm @error('priority') is-invalid @enderror" required>
+                        <option value="low" {{ old('priority') == 'low' ? 'selected' : '' }}>Rendah (SLA 72 Jam)</option>
+                        <option value="normal" {{ (old('priority', 'normal')) == 'normal' ? 'selected' : '' }}>Normal (SLA 48 Jam)</option>
+                        <option value="high" {{ old('priority') == 'high' ? 'selected' : '' }}>Tinggi (SLA 24 Jam)</option>
+                        <option value="urgent" {{ old('priority') == 'urgent' ? 'selected' : '' }}>Darurat / Urgent (SLA 6 Jam)</option>
+                    </select>
+                    @error('priority') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Judul Masalah / Kerusakan <span class="text-danger">*</span></label>
+                    <input type="text" name="title" class="form-control form-control-sm @error('title') is-invalid @enderror" value="{{ old('title') }}" placeholder="Contoh: Lampu kamar mandi mati & saklar longgar" required>
+                    @error('title') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Deskripsi Lengkap <span class="text-danger">*</span></label>
+                    <textarea name="description" rows="3" class="form-control form-control-sm @error('description') is-invalid @enderror" placeholder="Jelaskan detail kerusakan, lokasi tepat, dan kondisi saat ini..." required>{{ old('description') }}</textarea>
+                    @error('description') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Foto Bukti Kerusakan (Maks 5MB, format JPG/PNG/WebP)</label>
+                    <input type="file" name="photos_before[]" class="form-control form-control-sm @error('photos_before') is-invalid @enderror" multiple accept="image/jpeg,image/png,image/webp">
+                    @error('photos_before') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+            </div>
+        </div>
+
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">Batal</button>
+            <button type="submit" class="btn btn-primary-teal btn-sm px-3">
+                <i class="bi bi-send me-1"></i> Kirim Laporan Perbaikan
+            </button>
+        </div>
+    </form>
+</div>
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const propSelect = document.getElementById('drawerMaintenancePropertySelect');
+        const roomSelect = document.getElementById('drawerMaintenanceRoomSelect');
+
+        if (propSelect && roomSelect) {
+            function updateRooms() {
+                const selectedOpt = propSelect.options[propSelect.selectedIndex];
+                roomSelect.innerHTML = '<option value="">Area Bersama / Seluruh Properti</option>';
+
+                if (!selectedOpt || !selectedOpt.dataset.rooms) return;
+
+                try {
+                    const rooms = JSON.parse(selectedOpt.dataset.rooms);
+                    rooms.forEach(room => {
+                        const opt = document.createElement('option');
+                        opt.value = room.id;
+                        opt.textContent = 'Kamar ' + room.room_number + (room.name ? ' (' + room.name + ')' : '');
+                        roomSelect.appendChild(opt);
+                    });
+                } catch(e) {
+                    console.error("Gagal parse rooms data", e);
+                }
+            }
+
+            propSelect.addEventListener('change', updateRooms);
+            updateRooms();
+        }
+    });
+</script>
+@endpush
 @endsection

@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PropertyController;
 use App\Http\Controllers\Api\V1\RoomController;
 use App\Http\Controllers\Api\V1\UtilityController;
+use App\Http\Controllers\Api\V1\PublicBookingController;
+use App\Http\Controllers\Api\V1\DepositController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -19,6 +21,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('throttle:10,1')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register']);
         Route::post('/auth/login', [AuthController::class, 'login']);
+        Route::post('/auth/password-reset/complete', [\App\Http\Controllers\Api\V1\PasswordRecoveryController::class, 'complete']);
     });
 
     // Public Properties & Rooms
@@ -26,6 +29,17 @@ Route::prefix('v1')->group(function () {
     Route::get('/properties/{id}', [PropertyController::class, 'show']);
     Route::get('/properties/{property_id}/rooms', [RoomController::class, 'index']);
     Route::get('/rooms/{id}', [RoomController::class, 'show']);
+
+    // Public Catalog, Availability & Guest Booking
+    Route::prefix('public')->group(function () {
+        Route::get('/properties', [PublicBookingController::class, 'properties']);
+        Route::get('/rooms/availability', [PublicBookingController::class, 'searchAvailability']);
+        Route::post('/bookings/calculate-price', [PublicBookingController::class, 'calculatePrice']);
+        Route::middleware('throttle:15,1')->group(function () {
+            Route::post('/bookings', [PublicBookingController::class, 'storeGuestBooking']);
+            Route::get('/bookings/track/{token}', [PublicBookingController::class, 'trackBooking']);
+        });
+    });
 
     // Authenticated Endpoints (Sanctum)
     Route::middleware('auth:sanctum')->group(function () {
@@ -37,7 +51,25 @@ Route::prefix('v1')->group(function () {
         // Bookings
         Route::get('/bookings', [BookingController::class, 'index']);
         Route::post('/bookings', [BookingController::class, 'store']);
+        Route::post('/bookings/calculate-price', [BookingController::class, 'calculatePrice']);
         Route::get('/bookings/{id}', [BookingController::class, 'show']);
+        Route::post('/bookings/{id}/confirm', [BookingController::class, 'confirm']);
+        Route::post('/bookings/{id}/reject', [BookingController::class, 'reject']);
+        Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancel']);
+        Route::post('/bookings/{id}/check-in', [BookingController::class, 'checkIn']);
+
+        // Security Deposit Subledger & Check-Out Settlements
+        Route::get('/deposits', [DepositController::class, 'index']);
+        Route::get('/deposits/{id}', [DepositController::class, 'show']);
+        Route::post('/deposits/{id}/adjustment', [DepositController::class, 'recordAdjustment']);
+
+        Route::get('/settlements', [DepositController::class, 'settlementsIndex']);
+        Route::post('/settlements', [DepositController::class, 'initiateSettlement']);
+        Route::get('/settlements/{id}', [DepositController::class, 'settlementShow']);
+        Route::post('/settlements/{id}/tenant-decision', [DepositController::class, 'submitTenantDecision']);
+        Route::post('/settlements/{id}/resolve', [DepositController::class, 'resolveDispute']);
+        Route::post('/settlements/{id}/finalize', [DepositController::class, 'finalizeRefund']);
+        Route::post('/settlements/{id}/finalize-refund', [DepositController::class, 'finalizeRefund']);
 
         // Invoices & Payments (Tenant & Staff)
         Route::get('/invoices', [InvoiceController::class, 'index']);
@@ -57,15 +89,18 @@ Route::prefix('v1')->group(function () {
         // Room Inspections & Checklist (All Authenticated Users with proper policies)
         Route::get('/inspections', [InspectionController::class, 'index']);
         Route::post('/inspections', [InspectionController::class, 'store']);
-        Route::get('/inspections/{id}', [InspectionController::class, 'show']);
-        Route::post('/inspections/{id}/start', [InspectionController::class, 'start']);
-        Route::put('/inspections/{id}/items/{itemId}', [InspectionController::class, 'updateItem']);
-        Route::post('/inspections/{id}/media', [InspectionController::class, 'uploadMedia']);
-        Route::get('/inspections/{id}/media/{mediaId}', [InspectionController::class, 'streamMedia']);
-        Route::post('/inspections/{id}/complete', [InspectionController::class, 'complete']);
-        Route::post('/inspections/{id}/approve', [InspectionController::class, 'approve']);
-        Route::post('/inspections/{id}/object', [InspectionController::class, 'object']);
-        Route::get('/inspections/{id}/compare/{baselineId}', [InspectionController::class, 'compare']);
+        Route::post('/inspections/request', [InspectionController::class, 'tenantRequest']);
+        Route::get('/inspections/{id}', [InspectionController::class, 'show'])->whereNumber('id');
+        Route::post('/inspections/{id}/start', [InspectionController::class, 'start'])->whereNumber('id');
+        Route::put('/inspections/{id}/items/{itemId}', [InspectionController::class, 'updateItem'])->whereNumber('id');
+        Route::post('/inspections/{id}/media', [InspectionController::class, 'uploadMedia'])->whereNumber('id');
+        Route::get('/inspections/{id}/media/{mediaId}', [InspectionController::class, 'streamMedia'])->whereNumber('id');
+        Route::post('/inspections/{id}/complete', [InspectionController::class, 'complete'])->whereNumber('id');
+        Route::post('/inspections/{id}/approve', [InspectionController::class, 'approve'])->whereNumber('id');
+        Route::post('/inspections/{id}/object', [InspectionController::class, 'object'])->whereNumber('id');
+        Route::post('/inspections/{id}/assign', [InspectionController::class, 'assign'])->whereNumber('id');
+        Route::post('/inspections/{id}/reschedule', [InspectionController::class, 'reschedule'])->whereNumber('id');
+        Route::get('/inspections/{id}/compare/{baselineId}', [InspectionController::class, 'compare'])->whereNumber('id');
 
         // Utility Meters, Tariffs, Readings & Invoicing
         Route::get('/utilities/meters', [UtilityController::class, 'indexMeters']);
@@ -115,19 +150,40 @@ Route::prefix('v1')->group(function () {
         // Phase 5: Housekeeping Management
         Route::get('/housekeeping', [HousekeepingController::class, 'index']);
         Route::post('/housekeeping', [HousekeepingController::class, 'store']);
-        Route::get('/housekeeping/{id}', [HousekeepingController::class, 'show']);
-        Route::post('/housekeeping/{id}/assign', [HousekeepingController::class, 'assign']);
-        Route::post('/housekeeping/{id}/start', [HousekeepingController::class, 'start']);
-        Route::post('/housekeeping/{id}/submit-verification', [HousekeepingController::class, 'submitVerification']);
-        Route::post('/housekeeping/{id}/verify', [HousekeepingController::class, 'verify']);
-        Route::post('/housekeeping/{id}/cancel', [HousekeepingController::class, 'cancel']);
-        Route::get('/housekeeping/{id}/photo', [HousekeepingController::class, 'photo']);
+        Route::post('/housekeeping/request', [HousekeepingController::class, 'tenantRequest']);
+        Route::get('/housekeeping/{id}', [HousekeepingController::class, 'show'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/assign', [HousekeepingController::class, 'assign'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/start', [HousekeepingController::class, 'start'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/submit-verification', [HousekeepingController::class, 'submitVerification'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/verify', [HousekeepingController::class, 'verify'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/approve', [HousekeepingController::class, 'approve'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/request-revision', [HousekeepingController::class, 'requestRevision'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/reschedule', [HousekeepingController::class, 'reschedule'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/cancel', [HousekeepingController::class, 'cancel'])->whereNumber('id');
+        Route::post('/housekeeping/{id}/tenant-cancel', [HousekeepingController::class, 'tenantCancel'])->whereNumber('id');
+        Route::get('/housekeeping/{id}/photo', [HousekeepingController::class, 'photo'])->whereNumber('id');
 
         // Phase 5: Internal Notifications
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-        Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->whereNumber('id');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+        // Phase 10: Announcements (Pengumuman)
+        Route::get('/announcements', [\App\Http\Controllers\Api\V1\AnnouncementController::class, 'index']);
+        Route::get('/announcements/unread-count', [\App\Http\Controllers\Api\V1\AnnouncementController::class, 'unreadCount']);
+        Route::get('/announcements/{id}', [\App\Http\Controllers\Api\V1\AnnouncementController::class, 'show'])->whereNumber('id');
+        Route::post('/announcements/{id}/read', [\App\Http\Controllers\Api\V1\AnnouncementController::class, 'markAsRead'])->whereNumber('id');
+        Route::post('/announcements', [\App\Http\Controllers\Api\V1\AnnouncementController::class, 'store']);
+        Route::put('/announcements/{id}', [\App\Http\Controllers\Api\V1\AnnouncementController::class, 'update'])->whereNumber('id');
+        Route::delete('/announcements/{id}', [\App\Http\Controllers\Api\V1\AnnouncementController::class, 'destroy'])->whereNumber('id');
+
+        // Phase 10: Tenant Experience (Active Room, Identity Verification & NIK, Password Recovery Initiation)
+        Route::get('/tenant/active-room', [HousekeepingController::class, 'activeRoom']);
+        Route::get('/tenant/identity', [\App\Http\Controllers\Api\V1\IdentityVerificationController::class, 'show']);
+        Route::post('/tenant/identity/verify', [\App\Http\Controllers\Api\V1\IdentityVerificationController::class, 'verify']);
+        Route::put('/tenant/identity', [\App\Http\Controllers\Api\V1\IdentityVerificationController::class, 'update']);
+        Route::post('/auth/tenant/password-reset/initiate', [\App\Http\Controllers\Api\V1\PasswordRecoveryController::class, 'initiate']);
 
         // Phase 6: Operational Expense Management & Approval Workflow
         Route::get('/expenses', [\App\Http\Controllers\Api\V1\ExpenseApiController::class, 'index']);
@@ -149,5 +205,24 @@ Route::prefix('v1')->group(function () {
         Route::get('/finance/reports/cash-flow', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'cashFlow']);
         Route::get('/finance/reports/receivables', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'receivables']);
         Route::get('/finance/reports/operating-summary', [\App\Http\Controllers\Api\V1\FinancialReportApiController::class, 'operatingSummary']);
+
+        // Phase 8: Accounting, Double-Entry General Journal & Reconciliation
+        Route::prefix('finance/accounting')->group(function () {
+            Route::get('/coa', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'coa']);
+            Route::post('/coa', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'storeAccount']);
+            Route::get('/journals', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'journals']);
+            Route::get('/journals/{id}', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'journalDetail']);
+            Route::post('/journals/{id}/reverse', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'reverseJournal']);
+            Route::get('/reports/trial-balance', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'trialBalance']);
+            Route::get('/reports/income-statement', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'incomeStatement']);
+            Route::get('/reports/balance-sheet', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'balanceSheet']);
+            Route::get('/reports/reconciliation', [\App\Http\Controllers\Api\V1\AccountingApiController::class, 'reconciliation']);
+        });
+
+        // Fixed Assets & Operational Inventory API
+        Route::get('/assets', [\App\Http\Controllers\Api\V1\AssetApiController::class, 'index']);
+        Route::get('/assets/{id}', [\App\Http\Controllers\Api\V1\AssetApiController::class, 'show'])->whereNumber('id');
+        Route::post('/assets/{id}/report-issue', [\App\Http\Controllers\Api\V1\AssetApiController::class, 'reportIssue'])->whereNumber('id');
     });
 });
+

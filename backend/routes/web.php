@@ -10,12 +10,19 @@ use App\Http\Controllers\Web\MaintenanceWebController;
 use App\Http\Controllers\Web\PaymentVerificationController;
 use App\Http\Controllers\Web\RoomWebController;
 use App\Http\Controllers\Web\UtilityWebController;
+use App\Http\Controllers\Web\BookingWebController;
+use App\Http\Controllers\Web\DepositWebController;
+use App\Http\Controllers\Web\PublicWebController;
+use App\Http\Controllers\Web\AssetWebController;
 use Illuminate\Support\Facades\Route;
 
-// Redirect root to dashboard or login
-Route::get('/', function () {
-    return redirect()->route('dashboard.index');
-});
+// Public Website: Catalog, Room Detail & Guest Booking
+Route::get('/', [PublicWebController::class, 'catalog'])->name('public.home');
+Route::get('/catalog', [PublicWebController::class, 'catalog'])->name('public.catalog');
+Route::get('/rooms/{id}', [PublicWebController::class, 'roomDetail'])->name('public.rooms.show');
+Route::get('/booking/create', [PublicWebController::class, 'bookingForm'])->name('public.booking.create');
+Route::post('/booking/create', [PublicWebController::class, 'submitBooking'])->name('public.booking.submit');
+Route::get('/booking/track/{token}', [PublicWebController::class, 'trackBooking'])->name('public.booking.track');
 
 // Authentication Web Routes
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -24,8 +31,42 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Web Dashboard Protected Routes
 Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(function () {
-    // Main Unified Dashboard
+    // Main Unified Dashboard & Okupansi Kalender
     Route::get('/', [DashboardController::class, 'index'])->name('index');
+    Route::get('/calendar-data', [DashboardController::class, 'calendarData'])->name('calendar-data');
+
+    // Pemesanan Kamar (Booking) Management
+    Route::prefix('bookings')->name('bookings.')->group(function () {
+        Route::get('/', [BookingWebController::class, 'index'])->name('index');
+        Route::post('/', [BookingWebController::class, 'store'])->name('store');
+        Route::get('/{id}', [BookingWebController::class, 'show'])->name('show');
+        Route::post('/{id}/confirm', [BookingWebController::class, 'confirm'])->name('confirm');
+        Route::post('/{id}/reject', [BookingWebController::class, 'reject'])->name('reject');
+        Route::post('/{id}/cancel', [BookingWebController::class, 'cancel'])->name('cancel');
+        Route::post('/{id}/check-in', [BookingWebController::class, 'checkIn'])->name('checkin');
+    });
+
+    // Subledger Uang Jaminan (Security Deposit) & Check-Out Settlements
+    Route::prefix('deposits')->name('deposits.')->group(function () {
+        Route::get('/', [DepositWebController::class, 'index'])->name('index');
+
+        // Check-Out Settlements (MANDATORY: Define before /{id} wildcard to avoid route collision)
+        Route::prefix('settlements')->name('settlements.')->group(function () {
+            Route::get('/', [DepositWebController::class, 'settlementsIndex'])->name('index');
+            Route::post('/', [DepositWebController::class, 'initiateSettlement'])->name('initiate');
+            Route::get('/{id}', [DepositWebController::class, 'settlementShow'])->name('show')->whereNumber('id');
+            Route::post('/{id}/tenant-decision', [DepositWebController::class, 'submitTenantDecision'])->name('tenant_decision')->whereNumber('id');
+            Route::post('/{id}/resolve', [DepositWebController::class, 'resolveDispute'])->name('resolve')->whereNumber('id');
+            Route::post('/{id}/finalize', [DepositWebController::class, 'finalizeRefund'])->name('finalize')->whereNumber('id');
+        });
+
+        Route::get('/{id}', [DepositWebController::class, 'show'])->name('show')->whereNumber('id');
+        Route::post('/{id}/adjustment', [DepositWebController::class, 'recordAdjustment'])->name('adjustment')->whereNumber('id');
+    });
+
+    // Alias direct route /settlements
+    Route::get('/settlements', [DepositWebController::class, 'settlementsIndex'])->name('settlements.index');
+    Route::get('/settlements/{id}', [DepositWebController::class, 'settlementShow'])->name('settlements.show')->whereNumber('id');
 
     // Payments Verification Queue & Actions (Kasir, Manager, Owner, Super Admin)
     Route::middleware('role:super_admin,owner,manager,receptionist')->group(function () {
@@ -51,12 +92,34 @@ Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(functi
         Route::post('/inspections/{id}/media', [InspectionWebController::class, 'uploadMedia'])->name('inspections.media.upload');
         Route::get('/inspections/{id}/media/{mediaId}', [InspectionWebController::class, 'streamMedia'])->name('inspections.media.stream');
         Route::post('/inspections/{id}/complete', [InspectionWebController::class, 'complete'])->name('inspections.complete');
+        Route::post('/inspections/{id}/assign', [InspectionWebController::class, 'assign'])->name('inspections.assign');
+        Route::post('/inspections/{id}/reschedule', [InspectionWebController::class, 'reschedule'])->name('inspections.reschedule');
         Route::get('/inspections/{id}/compare', [InspectionWebController::class, 'compare'])->name('inspections.compare');
     });
 
-    // Rooms Housekeeping & Maintenance (Staff, Kasir, Manager, Owner, Super Admin)
-    Route::middleware('role:super_admin,owner,manager,receptionist,staff')->group(function () {
-        Route::post('/rooms/{id}/status', [RoomWebController::class, 'updateStatus'])->name('rooms.status');
+    // Master Kamar & Unit Hunian (Staff, Kasir, Manager, Owner, Super Admin)
+    Route::middleware('role:super_admin,owner,manager,receptionist,staff')->prefix('rooms')->name('rooms.')->group(function () {
+        Route::get('/', [RoomWebController::class, 'index'])->name('index');
+        Route::post('/', [RoomWebController::class, 'store'])->name('store');
+        Route::get('/{id}', [RoomWebController::class, 'show'])->name('show');
+        Route::put('/{id}', [RoomWebController::class, 'update'])->name('update');
+        Route::post('/{id}/status', [RoomWebController::class, 'updateStatus'])->name('status');
+        Route::post('/{id}/toggle-active', [RoomWebController::class, 'toggleActive'])->name('toggle-active');
+        Route::delete('/{id}', [RoomWebController::class, 'destroy'])->name('destroy');
+    });
+    Route::post('/rooms/{id}/status', [RoomWebController::class, 'updateStatus'])->name('rooms.status');
+    Route::post('/rooms/{id}/toggle-active', [RoomWebController::class, 'toggleActive'])->name('rooms.toggle-active');
+
+    // Manajemen Aset Tetap, Inventaris & Depresiasi (Staff, Kasir, Manager, Owner, Super Admin)
+    Route::middleware('role:super_admin,owner,manager,receptionist,staff')->prefix('assets')->name('assets.')->group(function () {
+        Route::get('/', [AssetWebController::class, 'index'])->name('index');
+        Route::post('/', [AssetWebController::class, 'store'])->name('store');
+        Route::get('/{id}', [AssetWebController::class, 'show'])->name('show');
+        Route::put('/{id}', [AssetWebController::class, 'update'])->name('update');
+        Route::post('/{id}/transfer', [AssetWebController::class, 'transferLocation'])->name('transfer-location');
+        Route::post('/{id}/dispose', [AssetWebController::class, 'dispose'])->name('dispose');
+        Route::post('/{id}/depreciation', [AssetWebController::class, 'postDepreciation'])->name('post-depreciation');
+        Route::post('/batch-depreciation', [AssetWebController::class, 'batchDepreciation'])->name('batch-depreciation');
     });
 
     // Utilities: Meters, Tariffs, Readings, Reviews & Invoicing
@@ -125,8 +188,22 @@ Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(functi
         Route::post('/{id}/start', [HousekeepingWebController::class, 'start'])->name('start');
         Route::post('/{id}/submit-verification', [HousekeepingWebController::class, 'submitVerification'])->name('submit-verification');
         Route::post('/{id}/verify', [HousekeepingWebController::class, 'verify'])->name('verify');
+        Route::post('/{id}/reschedule', [HousekeepingWebController::class, 'reschedule'])->name('reschedule');
         Route::post('/{id}/cancel', [HousekeepingWebController::class, 'cancel'])->name('cancel');
         Route::get('/{id}/photo', [HousekeepingWebController::class, 'photo'])->name('photo');
+    });
+
+    // Phase 10: Announcements (Papan Pengumuman)
+    Route::prefix('announcements')->name('announcements.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Web\AnnouncementWebController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Web\AnnouncementWebController::class, 'store'])->name('store');
+        Route::put('/{id}', [\App\Http\Controllers\Web\AnnouncementWebController::class, 'update'])->name('update');
+        Route::delete('/{id}', [\App\Http\Controllers\Web\AnnouncementWebController::class, 'destroy'])->name('destroy');
+    });
+
+    // Phase 10: Tenant Password Recovery Action (Super Admin, Owner, Manager)
+    Route::middleware('role:super_admin,owner,manager')->group(function () {
+        Route::post('/tenant/password-reset/initiate', [\App\Http\Controllers\Web\PasswordRecoveryWebController::class, 'initiate'])->name('tenant.password-reset.initiate');
     });
 
     // Phase 6: Financial Management, Expenses & Approval Workflow
@@ -158,5 +235,24 @@ Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(functi
         Route::get('/operating-summary', [\App\Http\Controllers\Web\FinanceWebController::class, 'operatingSummaryReport'])->name('operating-summary');
         Route::get('/export/{type}', [\App\Http\Controllers\Web\FinanceWebController::class, 'export'])->name('export');
     });
+
+    // Phase 8: Accounting, Double-Entry General Journal & Reconciliation
+    Route::prefix('accounting')->name('accounting.')->group(function () {
+        Route::get('/coa', [\App\Http\Controllers\Web\AccountingWebController::class, 'coa'])->name('coa');
+        Route::post('/coa', [\App\Http\Controllers\Web\AccountingWebController::class, 'storeAccount'])->name('coa.store');
+        Route::put('/coa/{id}', [\App\Http\Controllers\Web\AccountingWebController::class, 'updateAccount'])->name('coa.update');
+
+        Route::get('/journals', [\App\Http\Controllers\Web\AccountingWebController::class, 'journals'])->name('journals.index');
+        Route::get('/journals/{id}', [\App\Http\Controllers\Web\AccountingWebController::class, 'journalDetail'])->name('journals.show');
+        Route::post('/journals/{id}/reverse', [\App\Http\Controllers\Web\AccountingWebController::class, 'reverseJournal'])->name('journals.reverse');
+
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/trial-balance', [\App\Http\Controllers\Web\AccountingWebController::class, 'trialBalance'])->name('trial-balance');
+            Route::get('/income-statement', [\App\Http\Controllers\Web\AccountingWebController::class, 'incomeStatement'])->name('income-statement');
+            Route::get('/balance-sheet', [\App\Http\Controllers\Web\AccountingWebController::class, 'balanceSheet'])->name('balance-sheet');
+            Route::get('/reconciliation', [\App\Http\Controllers\Web\AccountingWebController::class, 'reconciliation'])->name('reconciliation');
+        });
+    });
 });
+
 

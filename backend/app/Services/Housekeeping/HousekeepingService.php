@@ -467,6 +467,182 @@ class HousekeepingService
     }
 
     /**
+     * Validasi hak akses penyewa terhadap kamar yang dibersihkan
+     */
+    public function validateTenantRoomAccess(HousekeepingTask $task, User $tenant): void
+    {
+        if (!$tenant->isTenant()) {
+            throw new DomainException('Hanya penyewa yang berhak melakukan konfirmasi hasil kebersihan.');
+        }
+
+        if (!$task->room_id) {
+            throw new DomainException('Tugas kebersihan ini bukan untuk unit kamar.');
+        }
+
+        $hasActiveBooking = Booking::where(function ($q) use ($tenant) {
+                $q->where('user_id', $tenant->id)
+                  ->orWhere('guest_email', $tenant->email);
+            })
+            ->where('room_id', $task->room_id)
+            ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+            ->exists();
+
+        if (!$hasActiveBooking) {
+            throw new DomainException('Anda tidak memiliki hak akses hunian pada kamar ini.');
+        }
+    }
+
+    /**
+     * Penyewa mengonfirmasi hasil kebersihan ("Sesuai — Konfirmasi Selesai")
+     */
+    public function tenantApproveTask(HousekeepingTask $task, ?string $feedback, User $tenant): HousekeepingTask
+    {
+        $this->validateTenantRoomAccess($task, $tenant);
+
+        if ($task->status !== HousekeepingStatus::PENDING_VERIFICATION) {
+            throw new DomainException("Hanya tugas berstatus 'Menunggu Verifikasi' yang dapat disetujui. Status saat ini: {$task->status->label()}.");
+        }
+
+        return DB::transaction(function () use ($task, $feedback, $tenant) {
+            $prevStatus = $task->status->value;
+
+            $task->update([
+                'status' => HousekeepingStatus::COMPLETED,
+                'verified_at' => now(),
+                'verified_by' => $tenant->id,
+                'verification_notes' => $feedback ?? 'Disetujui oleh penyewa: Hasil pembersihan kamar sesuai.',
+            ]);
+
+            HousekeepingLog::create([
+                'housekeeping_task_id' => $task->id,
+                'user_id' => $tenant->id,
+                'action' => 'tenant_approved',
+                'previous_status' => $prevStatus,
+                'new_status' => HousekeepingStatus::COMPLETED->value,
+                'notes' => "Penyewa {$tenant->name} mengonfirmasi pekerjaan kebersihan selesai. Catatan: " . ($feedback ?? '-'),
+            ]);
+
+            if ($task->assigned_to) {
+                $this->notificationService->createNotification(
+                    $task->assigned_to,
+                    'housekeeping_tenant_approved',
+                    "Hasil Pembersihan Dikonfirmasi Selesai",
+                    "Penyewa kamar {$task->area_name} telah menyetujui hasil pembersihan.",
+                    ['task_id' => $task->id, 'task_number' => $task->task_number],
+                    $task->property_id
+                );
+            }
+
+            return $task;
+        });
+    }
+
+    /**
+     * Penyewa mengajukan permintaan perbaikan ("Belum Sesuai — Minta Perbaikan")
+     */
+    public function tenantRequestRevision(HousekeepingTask $task, string $reason, ?array $problematicItems, User $tenant): HousekeepingTask
+    {
+        $this->validateTenantRoomAccess($task, $tenant);
+
+        if ($task->status !== HousekeepingStatus::PENDING_VERIFICATION) {
+            throw new DomainException("Permintaan perbaikan hanya dapat diajukan jika tugas menunggu verifikasi. Status saat ini: {$task->status->label()}.");
+        }
+
+        if (empty(trim($reason))) {
+            throw new DomainException('Alasan atau catatan perbaikan wajib diisi.');
+        }
+
+        return DB::transaction(function () use ($task, $reason, $problematicItems, $tenant) {
+            $prevStatus = $task->status->value;
+
+            $itemsSummary = !empty($problematicItems) ? ' [Item bermasalah: ' . implode(', ', $problematicItems) . ']' : '';
+            $revisionNote = "[Permintaan Perbaikan Penyewa] {$reason}{$itemsSummary}";
+
+            $task->update([
+                'notes' => ($task->notes ? $task->notes . "\n" : '') . $revisionNote,
+            ]);
+
+            HousekeepingLog::create([
+                'housekeeping_task_id' => $task->id,
+                'user_id' => $tenant->id,
+                'action' => 'revision_requested',
+                'previous_status' => $prevStatus,
+                'new_status' => $task->status->value,
+                'notes' => $revisionNote,
+            ]);
+
+            $supervisors = DB::table('property_users')
+                ->where('property_id', $task->property_id)
+                ->whereIn('role', ['owner', 'manager'])
+                ->pluck('user_id');
+
+            foreach ($supervisors as $supId) {
+                $this->notificationService->createNotification(
+                    $supId,
+                    'housekeeping_revision_requested',
+                    "Permintaan Perbaikan Kebersihan: {$task->area_name}",
+                    "Penyewa {$tenant->name} meminta perbaikan: {$reason}",
+                    ['task_id' => $task->id, 'task_number' => $task->task_number],
+                    $task->property_id
+                );
+            }
+
+            if ($task->assigned_to) {
+                $this->notificationService->createNotification(
+                    $task->assigned_to,
+                    'housekeeping_revision_requested',
+                    "Permintaan Perbaikan Kebersihan: {$task->area_name}",
+                    "Penyewa meminta perbaikan kebersihan: {$reason}",
+                    ['task_id' => $task->id, 'task_number' => $task->task_number],
+                    $task->property_id
+                );
+            }
+
+            return $task;
+        });
+    }
+
+    /**
+     * Jadwalkan ulang tanggal/slot tugas kebersihan
+     */
+    public function rescheduleTask(
+        HousekeepingTask $task,
+        string $newDate,
+        ?string $newSlot,
+        ?string $reason,
+        User $actor
+    ): HousekeepingTask {
+        if ($actor->isTenant() || $actor->isStaff() || $actor->isCashier()) {
+            throw new DomainException('Hanya Pemilik atau Manajer yang dapat menjadwalkan ulang tugas kebersihan.');
+        }
+
+        $this->authorizePropertyAccess($actor, $task->property_id);
+
+        if (in_array($task->status, [HousekeepingStatus::COMPLETED, HousekeepingStatus::CANCELLED])) {
+            throw new DomainException("Tugas dengan status {$task->status->label()} tidak dapat dijadwalkan ulang.");
+        }
+
+        return DB::transaction(function () use ($task, $newDate, $newSlot, $reason, $actor) {
+            $oldDate = $task->scheduled_date->format('Y-m-d');
+            $task->update([
+                'scheduled_date' => $newDate,
+                'scheduled_slot' => $newSlot ?? $task->scheduled_slot,
+            ]);
+
+            HousekeepingLog::create([
+                'housekeeping_task_id' => $task->id,
+                'user_id' => $actor->id,
+                'action' => 'rescheduled',
+                'previous_status' => $task->status->value,
+                'new_status' => $task->status->value,
+                'notes' => "Jadwal diubah dari {$oldDate} ke {$newDate} (slot: " . ($newSlot ?? '-') . ") oleh {$actor->name}. Alasan: " . ($reason ?? '-'),
+            ]);
+
+            return $task;
+        });
+    }
+
+    /**
      * Batalkan tugas kebersihan dengan alasan wajib
      */
     public function cancelTask(HousekeepingTask $task, string $reason, User $actor): HousekeepingTask
@@ -536,6 +712,189 @@ class HousekeepingService
         }
 
         return Storage::disk('local')->path($filePath);
+    }
+
+    /**
+     * Pengajuan Pembersihan Kamar oleh Penyewa (Tenant Request)
+     */
+    public function requestRoomCleaning(User $tenant, array $data): HousekeepingTask
+    {
+        if (!$tenant->isTenant()) {
+            throw new DomainException('Hanya penyewa yang dapat mengajukan pembersihan kamar melalui menu ini.');
+        }
+
+        // Cari booking aktif penyewa
+        $booking = Booking::with('room.roomType', 'property')
+            ->where(function ($q) use ($tenant) {
+                $q->where('user_id', $tenant->id)
+                  ->orWhere('guest_email', $tenant->email);
+            })
+            ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+            ->latest('id')
+            ->first();
+
+        if (!$booking || !$booking->room_id) {
+            throw new DomainException('Anda tidak memiliki kamar aktif yang terdaftar untuk mengajukan pembersihan.');
+        }
+
+        $propertyId = $booking->property_id;
+        $roomId = $booking->room_id;
+        $scheduledDate = $data['scheduled_date'] ?? now()->toDateString();
+
+        // Cegah duplikasi pengajuan yang belum selesai pada tanggal yang sama
+        $existingActive = HousekeepingTask::where('room_id', $roomId)
+            ->whereDate('scheduled_date', $scheduledDate)
+            ->whereIn('status', [
+                HousekeepingStatus::SCHEDULED,
+                HousekeepingStatus::ASSIGNED,
+                HousekeepingStatus::IN_PROGRESS,
+                HousekeepingStatus::PENDING_VERIFICATION,
+            ])
+            ->exists();
+
+        if ($existingActive) {
+            throw new DomainException("Sudah ada jadwal atau pengajuan pembersihan aktif untuk kamar Anda pada tanggal {$scheduledDate}.");
+        }
+
+        $taskNumber = 'HK-REQ-' . date('Ymd') . '-' . strtoupper(Str::random(5));
+        $roomNumber = $booking->room->room_number ?? "Kamar {$roomId}";
+
+        $checklist = [
+            ['id' => 1, 'task' => 'Sapu dan pel lantai kamar', 'is_done' => false],
+            ['id' => 2, 'task' => 'Ganti sprei & sarung bantal', 'is_done' => false],
+            ['id' => 3, 'task' => 'Bersihkan kamar mandi & kloset', 'is_done' => false],
+            ['id' => 4, 'task' => 'Kosongkan dan buang tempat sampah', 'is_done' => false],
+            ['id' => 5, 'task' => 'Cek kelengkapan fasilitas & perabot', 'is_done' => false],
+        ];
+
+        return DB::transaction(function () use (
+            $taskNumber,
+            $propertyId,
+            $roomId,
+            $roomNumber,
+            $scheduledDate,
+            $data,
+            $checklist,
+            $tenant
+        ) {
+            $task = HousekeepingTask::create([
+                'task_number' => $taskNumber,
+                'property_id' => $propertyId,
+                'room_id' => $roomId,
+                'area_name' => "Kamar {$roomNumber}",
+                'type' => HousekeepingType::ON_DEMAND,
+                'priority' => $data['priority'] ?? 'normal',
+                'scheduled_date' => $scheduledDate,
+                'scheduled_slot' => $data['scheduled_slot'] ?? 'Pagi (08:00 - 11:00)',
+                'assigned_to' => null,
+                'assigned_by' => null,
+                'status' => HousekeepingStatus::SCHEDULED,
+                'checklist' => $checklist,
+                'notes' => '[Pengajuan Penyewa: ' . $tenant->name . '] ' . ($data['notes'] ?? ''),
+            ]);
+
+            HousekeepingLog::create([
+                'housekeeping_task_id' => $task->id,
+                'user_id' => $tenant->id,
+                'action' => 'requested',
+                'previous_status' => null,
+                'new_status' => HousekeepingStatus::SCHEDULED->value,
+                'notes' => 'Penyewa mengajukan pembersihan kamar. Catatan: ' . ($data['notes'] ?? '-'),
+            ]);
+
+            // Beri notifikasi in-app kepada staf & manajer properti
+            $staffUserIds = DB::table('property_users')
+                ->where('property_id', $propertyId)
+                ->pluck('user_id');
+
+            foreach ($staffUserIds as $staffId) {
+                $this->notificationService->createNotification(
+                    user: $staffId,
+                    type: 'housekeeping_requested',
+                    title: "Pengajuan Pembersihan: Kamar {$roomNumber}",
+                    message: "Penyewa {$tenant->name} mengajukan pembersihan kamar untuk tanggal {$scheduledDate}.",
+                    data: [
+                        'task_id' => $task->id,
+                        'task_number' => $task->task_number,
+                        'action_url' => "/housekeeping/{$task->id}",
+                    ],
+                    propertyId: $propertyId
+                );
+            }
+
+            return $task;
+        });
+    }
+
+    /**
+     * Batalkan pengajuan pembersihan kamar oleh penyewa
+     */
+    public function cancelCleaningRequest(int $taskId, User $tenant, ?string $reason = null): HousekeepingTask
+    {
+        $task = HousekeepingTask::findOrFail($taskId);
+
+        if ($tenant->isTenant()) {
+            $activeRoomIds = Booking::where('user_id', $tenant->id)
+                ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+                ->pluck('room_id')
+                ->toArray();
+
+            if (!in_array($task->room_id, $activeRoomIds, true)) {
+                throw new DomainException('Anda tidak berhak membatalkan pengajuan pada kamar ini.');
+            }
+
+            if ($task->status !== HousekeepingStatus::SCHEDULED) {
+                throw new DomainException('Pengajuan hanya dapat dibatalkan jika belum mulai dikerjakan oleh petugas.');
+            }
+        }
+
+        $prevStatus = $task->status->value;
+        $task->update([
+            'status' => HousekeepingStatus::CANCELLED,
+            'cancellation_reason' => $reason ?? 'Dibatalkan atas permintaan penyewa.',
+        ]);
+
+        HousekeepingLog::create([
+            'housekeeping_task_id' => $task->id,
+            'user_id' => $tenant->id,
+            'action' => 'cancelled',
+            'previous_status' => $prevStatus,
+            'new_status' => HousekeepingStatus::CANCELLED->value,
+            'notes' => $reason ?? 'Dibatalkan oleh penyewa.',
+        ]);
+
+        return $task;
+    }
+
+    /**
+     * Ambil data kamar aktif milik penyewa
+     */
+    public function getActiveRoomForTenant(User $tenant): ?array
+    {
+        $booking = Booking::with(['room.roomType', 'property'])
+            ->where(function ($q) use ($tenant) {
+                $q->where('user_id', $tenant->id)
+                  ->orWhere('guest_email', $tenant->email);
+            })
+            ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+            ->latest('id')
+            ->first();
+
+        if (!$booking || !$booking->room) {
+            return null;
+        }
+
+        return [
+            'booking_id' => $booking->id,
+            'booking_code' => $booking->booking_code,
+            'property_id' => $booking->property_id,
+            'property_name' => $booking->property->name ?? '-',
+            'room_id' => $booking->room_id,
+            'room_number' => $booking->room->room_number,
+            'room_type' => $booking->room->roomType->name ?? 'Standard',
+            'check_in_date' => $booking->start_date ? $booking->start_date->format('Y-m-d') : null,
+            'check_out_date' => $booking->end_date ? $booking->end_date->format('Y-m-d') : null,
+        ];
     }
 
     protected function validatePhotoFile(UploadedFile $file): void

@@ -94,6 +94,36 @@ class InspectionController extends ApiController
         }
     }
 
+    /**
+     * POST /api/v1/inspections/request
+     * Pengajuan Inspeksi Kamar oleh Penyewa
+     */
+    public function tenantRequest(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'type' => ['nullable', 'in:periodic,maintenance,check_out'],
+            'reason' => ['nullable', 'string', 'max:150'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'scheduled_date' => ['nullable', 'date'],
+            'photos' => ['nullable', 'array'],
+            'photos.*' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $photos = $request->file('photos', []);
+        if (!is_array($photos)) {
+            $photos = $photos ? [$photos] : [];
+        }
+
+        try {
+            $inspection = $this->inspectionService->requestInspection($user, $validated, $photos);
+            return $this->successResponse($inspection, 'Permohonan inspeksi kamar berhasil diajukan ke pengelola.', 201);
+        } catch (DomainException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
     public function show(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
@@ -304,11 +334,61 @@ class InspectionController extends ApiController
 
         $validated = $request->validate([
             'notes' => ['required', 'string', 'min:5', 'max:1000'],
+            'problematic_items' => ['nullable', 'array'],
+            'problematic_items.*' => ['string', 'max:100'],
         ]);
 
         try {
-            $objected = $this->inspectionService->tenantObject($inspection, $validated['notes'], $user);
+            $objected = $this->inspectionService->tenantObject(
+                $inspection,
+                $validated['notes'],
+                $user,
+                $validated['problematic_items'] ?? null
+            );
             return $this->successResponse($objected, 'Keberatan hasil inspeksi kamar berhasil dicatat untuk tindak lanjut pengelola.');
+        } catch (DomainException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * POST /api/v1/inspections/{id}/assign
+     * Penugasan inspektor oleh manajer
+     */
+    public function assign(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $inspection = Inspection::findOrFail($id);
+
+        $request->validate([
+            'inspector_id' => 'required|exists:users,id',
+        ]);
+
+        try {
+            $assigned = $this->inspectionService->assignInspector($inspection, (int) $request->inspector_id, $user);
+            return $this->successResponse($assigned, 'Inspektor berhasil ditugaskan.');
+        } catch (DomainException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * POST /api/v1/inspections/{id}/reschedule
+     * Penjadwalan ulang tanggal inspeksi kamar oleh manajer
+     */
+    public function reschedule(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $inspection = Inspection::findOrFail($id);
+
+        $request->validate([
+            'scheduled_date' => 'required|date',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $rescheduled = $this->inspectionService->rescheduleInspection($inspection, $request->scheduled_date, $request->reason, $user);
+            return $this->successResponse($rescheduled, 'Jadwal inspeksi kamar berhasil diperbarui.');
         } catch (DomainException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

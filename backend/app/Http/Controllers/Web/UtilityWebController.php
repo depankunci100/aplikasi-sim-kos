@@ -43,7 +43,7 @@ class UtilityWebController extends Controller
             $accessible = $this->utilityService->getAccessiblePropertyIds($user);
             $propertiesQuery->whereIn('id', $accessible ?? []);
         }
-        $properties = $propertiesQuery->orderBy('name')->get();
+        $properties = $propertiesQuery->with('rooms')->orderBy('name')->get();
 
         return view('dashboard.utilities.meters.index', compact('meters', 'properties', 'filters'));
     }

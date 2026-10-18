@@ -13,9 +13,9 @@
         <a href="{{ route('dashboard.utilities.readings.create') }}" class="btn btn-outline-teal btn-sm d-flex align-items-center gap-1 border-teal text-teal">
             <i class="bi bi-pencil-square"></i> Catat Pembacaan
         </a>
-        <a href="{{ route('dashboard.utilities.meters.create') }}" class="btn btn-primary-teal btn-sm d-flex align-items-center gap-1">
+        <button type="button" class="btn btn-primary-teal btn-sm d-flex align-items-center gap-1" data-bs-toggle="offcanvas" data-bs-target="#createMeterDrawer" aria-controls="createMeterDrawer">
             <i class="bi bi-plus-circle"></i> Tambah Meter Baru
-        </a>
+        </button>
     </div>
     @endif
 </div>
@@ -158,4 +158,137 @@
     </div>
     @endif
 </div>
+
+<!-- Right-Side Drawer: Tambah Meter Utilitas Baru -->
+@if(!auth()->user()->isTenant())
+<div class="offcanvas offcanvas-end drawer-md" tabindex="-1" id="createMeterDrawer" aria-labelledby="createMeterDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2" id="createMeterDrawerLabel">
+            <i class="bi bi-speedometer2 text-primary-teal"></i> Tambah Meter Baru
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+    </div>
+    <form action="{{ route('dashboard.utilities.meters.store') }}" method="POST" class="d-flex flex-column h-100">
+        @csrf
+        <input type="hidden" name="_drawer_id" value="createMeterDrawer">
+
+        <div class="offcanvas-body">
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Properti <span class="text-danger">*</span></label>
+                    <select name="property_id" id="drawerMeterPropertySelect" class="form-select form-select-sm @error('property_id') is-invalid @enderror" required>
+                        <option value="">-- Pilih Properti --</option>
+                        @foreach($properties as $property)
+                            <option value="{{ $property->id }}" {{ old('property_id') == $property->id ? 'selected' : '' }}>
+                                {{ $property->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Kamar (Opsional)</label>
+                    <select name="room_id" id="drawerMeterRoomSelect" class="form-select form-select-sm @error('room_id') is-invalid @enderror">
+                        <option value="">-- Kosongkan untuk Meter Komunal / Fasilitas Bersama --</option>
+                        @foreach($properties as $property)
+                            @foreach($property->rooms as $room)
+                                <option value="{{ $room->id }}" data-property="{{ $property->id }}" {{ old('room_id') == $room->id ? 'selected' : '' }}>
+                                    {{ $property->name }} - Kamar {{ $room->room_number }}
+                                </option>
+                            @endforeach
+                        @endforeach
+                    </select>
+                    <div class="form-text small">Pilih kamar jika meter ditujukan khusus untuk satu kamar.</div>
+                    @error('room_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Jenis Utilitas <span class="text-danger">*</span></label>
+                    <select name="utility_type" id="drawerMeterUtilitySelect" class="form-select form-select-sm @error('utility_type') is-invalid @enderror" required>
+                        <option value="electricity" {{ old('utility_type', 'electricity') === 'electricity' ? 'selected' : '' }}>Listrik (kWh)</option>
+                        <option value="water" {{ old('utility_type') === 'water' ? 'selected' : '' }}>Air (m³)</option>
+                    </select>
+                    @error('utility_type') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold small">Satuan Pembacaan <span class="text-danger">*</span></label>
+                    <input type="text" name="unit" id="drawerMeterUnitInput" class="form-control form-control-sm @error('unit') is-invalid @enderror" value="{{ old('unit', 'kWh') }}" required>
+                    @error('unit') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Nomor / Seri Fisik Meter <span class="text-danger">*</span></label>
+                    <input type="text" name="meter_number" class="form-control form-control-sm @error('meter_number') is-invalid @enderror" placeholder="Contoh: PLN-140229871" value="{{ old('meter_number') }}" required>
+                    @error('meter_number') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Tipe Meter <span class="text-danger">*</span></label>
+                    <select name="meter_type" class="form-select form-select-sm @error('meter_type') is-invalid @enderror" required>
+                        <option value="individual" {{ old('meter_type', 'individual') === 'individual' ? 'selected' : '' }}>Individual (Kamar)</option>
+                        <option value="shared" {{ old('meter_type') === 'shared' ? 'selected' : '' }}>Bersama (Komunal)</option>
+                    </select>
+                    @error('meter_type') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Pembacaan Awal <span class="text-danger">*</span></label>
+                    <input type="number" step="0.01" name="initial_reading" class="form-control form-control-sm @error('initial_reading') is-invalid @enderror" value="{{ old('initial_reading', '0.00') }}" required>
+                    @error('initial_reading') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Kapasitas Maksimum</label>
+                    <input type="number" step="0.01" name="max_reading" class="form-control form-control-sm @error('max_reading') is-invalid @enderror" placeholder="Kosongkan jika standar" value="{{ old('max_reading') }}">
+                    @error('max_reading') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Tanggal Pemasangan</label>
+                    <input type="date" name="installed_at" class="form-control form-control-sm @error('installed_at') is-invalid @enderror" value="{{ old('installed_at', date('Y-m-d')) }}">
+                    @error('installed_at') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+            </div>
+        </div>
+
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">Batal</button>
+            <button type="submit" class="btn btn-primary-teal btn-sm px-3">
+                <i class="bi bi-save me-1"></i> Simpan Meter
+            </button>
+        </div>
+    </form>
+</div>
+@endif
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const propSelect = document.getElementById('drawerMeterPropertySelect');
+        const roomSelect = document.getElementById('drawerMeterRoomSelect');
+        const utilSelect = document.getElementById('drawerMeterUtilitySelect');
+        const unitInput = document.getElementById('drawerMeterUnitInput');
+
+        if (propSelect && roomSelect) {
+            function filterRooms() {
+                const selectedPropId = propSelect.value;
+                Array.from(roomSelect.options).forEach(opt => {
+                    if (!opt.value) return;
+                    opt.style.display = (!selectedPropId || opt.dataset.property === selectedPropId) ? '' : 'none';
+                });
+            }
+            propSelect.addEventListener('change', filterRooms);
+            filterRooms();
+        }
+
+        if (utilSelect && unitInput) {
+            utilSelect.addEventListener('change', function () {
+                unitInput.value = this.value === 'electricity' ? 'kWh' : 'm3';
+            });
+        }
+    });
+</script>
+@endpush
 @endsection

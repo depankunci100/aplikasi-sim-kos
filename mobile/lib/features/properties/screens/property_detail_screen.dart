@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../models/property_model.dart';
@@ -132,18 +133,22 @@ class PropertyDetailScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            const _RoomTypeSampleCard(
+            _RoomTypeSampleCard(
               title: 'Deluxe AC (Kamar Mandi Dalam)',
               priceDaily: 180000,
               priceMonthly: 1500000,
               availableCount: 3,
+              propertyId: property.id,
+              propertyName: property.name,
             ),
             const SizedBox(height: 12),
-            const _RoomTypeSampleCard(
+            _RoomTypeSampleCard(
               title: 'Standard Fan (Ventilasi Alami)',
               priceDaily: 100000,
               priceMonthly: 850000,
               availableCount: 3,
+              propertyId: property.id,
+              propertyName: property.name,
             ),
             const SizedBox(height: 24),
           ],
@@ -158,12 +163,16 @@ class _RoomTypeSampleCard extends StatelessWidget {
   final num priceDaily;
   final num priceMonthly;
   final int availableCount;
+  final int? propertyId;
+  final String? propertyName;
 
   const _RoomTypeSampleCard({
     required this.title,
     required this.priceDaily,
     required this.priceMonthly,
     required this.availableCount,
+    this.propertyId,
+    this.propertyName,
   });
 
   @override
@@ -230,8 +239,14 @@ class _RoomTypeSampleCard extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Pemesanan untuk tipe "$title" dipilih.')),
+                  context.push(
+                    '/guest/book',
+                    extra: {
+                      'room_id': propertyId ?? 1,
+                      'property_name': propertyName ?? 'Kos Permata Hijau',
+                      'room_number': '101',
+                      'room_type_name': title,
+                    },
                   );
                 },
                 child: const Text('Pesan Kamar Sekarang'),

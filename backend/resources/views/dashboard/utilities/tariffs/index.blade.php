@@ -9,7 +9,7 @@
         <p class="text-muted small mb-0">Atur harga per satuan (kWh atau m³) per properti dengan rentang masa berlaku.</p>
     </div>
     @if(!auth()->user()->isTenant() && !auth()->user()->isStaff())
-    <button type="button" class="btn btn-primary-teal btn-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalCreateTariff">
+    <button type="button" class="btn btn-primary-teal btn-sm d-flex align-items-center gap-1" data-bs-toggle="offcanvas" data-bs-target="#createTariffDrawer" aria-controls="createTariffDrawer">
         <i class="bi bi-plus-circle"></i> Tambah Tarif Baru
     </button>
     @endif
@@ -135,84 +135,94 @@
     @endif
 </div>
 
-<!-- Modal Tambah Tarif -->
+<!-- Right-Side Drawer: Konfigurasi Tarif Baru -->
 @if(!auth()->user()->isTenant() && !auth()->user()->isStaff())
-<div class="modal fade" id="modalCreateTariff" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form action="{{ route('dashboard.utilities.tariffs.store') }}" method="POST">
-                @csrf
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-dark">Konfigurasi Tarif Baru</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Properti <span class="text-danger">*</span></label>
-                        <select name="property_id" class="form-select" required>
-                            @foreach($properties as $property)
-                                <option value="{{ $property->id }}">{{ $property->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-sm-6">
-                            <label class="form-label small fw-semibold">Jenis Utilitas <span class="text-danger">*</span></label>
-                            <select name="utility_type" id="modalTariffUtility" class="form-select" required>
-                                <option value="electricity">Listrik (kWh)</option>
-                                <option value="water">Air (m³)</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label small fw-semibold">Satuan <span class="text-danger">*</span></label>
-                            <input type="text" name="unit" id="modalTariffUnit" class="form-control" value="kWh" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Tarif per Satuan (IDR) <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text">Rp</span>
-                            <input type="number" step="0.01" name="rate_per_unit" class="form-control" placeholder="Contoh: 1500" required>
-                        </div>
-                        <div class="form-text small">Gunakan angka nominal bulat atau desimal (misal 1500 atau 1444.70).</div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-sm-6">
-                            <label class="form-label small fw-semibold">Mulai Berlaku <span class="text-danger">*</span></label>
-                            <input type="date" name="effective_from" class="form-control" value="{{ date('Y-m-d') }}" required>
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label small fw-semibold">Berlaku Sampai (Opsional)</label>
-                            <input type="date" name="effective_to" class="form-control">
-                            <div class="form-text small">Kosongkan jika berlaku tanpa batas.</div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Catatan / Dasar SK Tarif</label>
-                        <textarea name="notes" rows="2" class="form-control" placeholder="Contoh: Penyesuaian tarif listrik PLN triwulan IV"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary-teal">
-                        <i class="bi bi-save me-1"></i> Simpan Tarif
-                    </button>
-                </div>
-            </form>
-        </div>
+<div class="offcanvas offcanvas-end drawer-md" tabindex="-1" id="createTariffDrawer" aria-labelledby="createTariffDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2" id="createTariffDrawerLabel">
+            <i class="bi bi-tags text-primary-teal"></i> Konfigurasi Tarif Baru
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
     </div>
+    <form action="{{ route('dashboard.utilities.tariffs.store') }}" method="POST" class="d-flex flex-column h-100">
+        @csrf
+        <input type="hidden" name="_drawer_id" value="createTariffDrawer">
+
+        <div class="offcanvas-body">
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Properti <span class="text-danger">*</span></label>
+                <select name="property_id" class="form-select form-select-sm @error('property_id') is-invalid @enderror" required>
+                    @foreach($properties as $property)
+                        <option value="{{ $property->id }}" {{ old('property_id') == $property->id ? 'selected' : '' }}>{{ $property->name }}</option>
+                    @endforeach
+                </select>
+                @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-sm-6">
+                    <label class="form-label small fw-semibold">Jenis Utilitas <span class="text-danger">*</span></label>
+                    <select name="utility_type" id="drawerTariffUtility" class="form-select form-select-sm @error('utility_type') is-invalid @enderror" required>
+                        <option value="electricity" {{ old('utility_type') === 'electricity' ? 'selected' : '' }}>Listrik (kWh)</option>
+                        <option value="water" {{ old('utility_type') === 'water' ? 'selected' : '' }}>Air (m³)</option>
+                    </select>
+                    @error('utility_type') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label small fw-semibold">Satuan <span class="text-danger">*</span></label>
+                    <input type="text" name="unit" id="drawerTariffUnit" class="form-control form-control-sm @error('unit') is-invalid @enderror" value="{{ old('unit', 'kWh') }}" required>
+                    @error('unit') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Tarif per Satuan (IDR) <span class="text-danger">*</span></label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">Rp</span>
+                    <input type="number" step="0.01" name="rate_per_unit" class="form-control @error('rate_per_unit') is-invalid @enderror"
+                           placeholder="Contoh: 1500" value="{{ old('rate_per_unit') }}" required>
+                </div>
+                <div class="form-text small">Gunakan angka nominal bulat atau desimal (misal 1500 atau 1444.70).</div>
+                @error('rate_per_unit') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-sm-6">
+                    <label class="form-label small fw-semibold">Mulai Berlaku <span class="text-danger">*</span></label>
+                    <input type="date" name="effective_from" class="form-control form-control-sm @error('effective_from') is-invalid @enderror"
+                           value="{{ old('effective_from', date('Y-m-d')) }}" required>
+                    @error('effective_from') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label small fw-semibold">Berlaku Sampai (Opsional)</label>
+                    <input type="date" name="effective_to" class="form-control form-control-sm @error('effective_to') is-invalid @enderror" value="{{ old('effective_to') }}">
+                    <div class="form-text small">Kosongkan jika berlaku tanpa batas.</div>
+                    @error('effective_to') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Catatan / Dasar SK Tarif</label>
+                <textarea name="notes" rows="3" class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                          placeholder="Contoh: Penyesuaian tarif listrik PLN triwulan IV">{{ old('notes') }}</textarea>
+                @error('notes') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            </div>
+        </div>
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">Batal</button>
+            <button type="submit" class="btn btn-primary-teal btn-sm px-3">
+                <i class="bi bi-save me-1"></i> Simpan Tarif
+            </button>
+        </div>
+    </form>
 </div>
 @endif
 
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const utilSelect = document.getElementById('modalTariffUtility');
-        const unitInput = document.getElementById('modalTariffUnit');
+        const utilSelect = document.getElementById('drawerTariffUtility');
+        const unitInput = document.getElementById('drawerTariffUnit');
         if (utilSelect && unitInput) {
             utilSelect.addEventListener('change', function () {
                 unitInput.value = this.value === 'electricity' ? 'kWh' : 'm3';

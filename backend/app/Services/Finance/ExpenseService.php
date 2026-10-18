@@ -452,6 +452,10 @@ class ExpenseService
                 ],
             ]);
 
+            // Phase 8: Otomatis posting jurnal pengeluaran operasional
+            $journalService = app(\App\Services\Accounting\JournalPostingService::class);
+            $journalService->postExpensePaymentJournal($payment, $user);
+
             return $payment;
         });
     }

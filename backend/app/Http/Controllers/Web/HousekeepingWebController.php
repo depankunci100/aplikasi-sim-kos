@@ -34,14 +34,14 @@ class HousekeepingWebController extends Controller
         ];
 
         if ($user->isSuperAdmin()) {
-            $properties = Property::active()->get();
+            $properties = Property::with(['rooms', 'users'])->active()->get();
         } elseif ($user->isTenant()) {
             $propertyIds = Booking::where('user_id', $user->id)
                 ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                 ->pluck('property_id');
-            $properties = Property::whereIn('id', $propertyIds)->active()->get();
+            $properties = Property::whereIn('id', $propertyIds)->with(['rooms', 'users'])->active()->get();
         } else {
-            $properties = $user->properties()->active()->get();
+            $properties = $user->properties()->with(['rooms', 'users'])->active()->get();
         }
 
         return view('dashboard.housekeeping.index', compact('tasks', 'properties', 'filters', 'counts'));
@@ -264,6 +264,32 @@ class HousekeepingWebController extends Controller
             } catch (DomainException $e) {
                 abort(403, $e->getMessage());
             }
+        }
+    }
+
+    public function reschedule(Request $request, int $id)
+    {
+        $user = $request->user();
+        $task = HousekeepingTask::findOrFail($id);
+        $this->authorizeHousekeepingAccess($user, $task);
+
+        $request->validate([
+            'scheduled_date' => 'required|date',
+            'scheduled_slot' => 'nullable|string|max:50',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $this->housekeepingService->rescheduleTask(
+                $task,
+                $request->scheduled_date,
+                $request->scheduled_slot,
+                $request->reason,
+                $user
+            );
+            return back()->with('success', 'Jadwal tugas kebersihan berhasil diperbarui.');
+        } catch (DomainException $e) {
+            return back()->with('error', $e->getMessage());
         }
     }
 }

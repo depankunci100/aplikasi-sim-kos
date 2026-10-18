@@ -118,14 +118,46 @@ class PaymentService
             // perbarui status booking dari PENDING ke CONFIRMED
             if ($invoice->booking_id) {
                 $booking = Booking::where('id', $invoice->booking_id)->lockForUpdate()->first();
-                if ($booking && $booking->status === BookingStatus::PENDING) {
-                    $minPayment = $booking->deposit_amount > 0 ? $booking->deposit_amount : ($booking->total_amount * 0.3);
-                    if ($invoice->isPaid() || (float)$invoice->paid_amount >= (float)$minPayment) {
-                        $booking->status = BookingStatus::CONFIRMED;
-                        $booking->save();
+                if ($booking) {
+                    if ($booking->status === BookingStatus::PENDING) {
+                        $minPayment = $booking->down_payment_amount > 0
+                            ? $booking->down_payment_amount
+                            : ($booking->deposit_amount > 0 ? $booking->deposit_amount : ($booking->total_amount * 0.3));
+                        if ($invoice->isPaid() || (float)$invoice->paid_amount >= (float)$minPayment) {
+                            $booking->status = BookingStatus::CONFIRMED;
+                            $booking->save();
+                        }
+                    }
+
+                    // Sinkronisasi Uang Jaminan (Deposit Subledger):
+                    // Jika booking mensyaratkan deposit dan pembayaran terverifikasi, catat penerimaan deposit ke ledger
+                    if ((float)$booking->deposit_amount > 0) {
+                        $depositService = app(\App\Services\Deposit\DepositService::class);
+                        $ledger = $depositService->getOrCreateLedgerForBooking($booking);
+                        $alreadyCredited = \App\Models\DepositMutation::where('deposit_ledger_id', $ledger->id)
+                            ->where('payment_id', $lockedPayment->id)
+                            ->exists();
+
+                        if (!$alreadyCredited && (float)$ledger->current_balance < (float)$booking->deposit_amount) {
+                            $needed = (float)$booking->deposit_amount - (float)$ledger->total_received;
+                            $depositCredit = min((float)$lockedPayment->amount, $needed);
+                            if ($depositCredit > 0) {
+                                $depositService->recordDepositReceived($ledger, $depositCredit, $verifier, [
+                                    'payment_method' => $lockedPayment->payment_method ?? 'bank_transfer',
+                                    'payment_reference' => $lockedPayment->payment_code,
+                                    'invoice_id' => $invoice->id,
+                                    'payment_id' => $lockedPayment->id,
+                                    'notes' => 'Penerimaan deposit dari verifikasi pembayaran ' . $lockedPayment->payment_code,
+                                ]);
+                            }
+                        }
                     }
                 }
             }
+
+            // Phase 8: Otomatis posting jurnal berpasangan dari pembayaran yang telah diverifikasi sah
+            $journalService = app(\App\Services\Accounting\JournalPostingService::class);
+            $journalService->postPaymentJournal($lockedPayment, $verifier);
 
             return $lockedPayment->load(['invoice', 'user', 'verifier']);
         });

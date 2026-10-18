@@ -56,5 +56,6 @@ mobile/android/app/release
 mobile/**/*.iml
 mobile/ios/Flutter/.last_build_id
 
-# Logs
+# Logs & Binaries
 *.log
+*.apk

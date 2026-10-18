@@ -12,9 +12,9 @@
         <a href="{{ route('dashboard.expenses.categories') }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1">
             <i class="bi bi-tags"></i> Kategori
         </a>
-        <a href="{{ route('dashboard.expenses.create') }}" class="btn btn-primary-teal d-flex align-items-center gap-1">
+        <button type="button" class="btn btn-primary-teal d-flex align-items-center gap-1" data-bs-toggle="offcanvas" data-bs-target="#createExpenseDrawer" aria-controls="createExpenseDrawer">
             <i class="bi bi-plus-circle"></i> Catat Pengeluaran
-        </a>
+        </button>
     </div>
 </div>
 
@@ -215,5 +215,112 @@
         </div>
         @endif
     </div>
+</div>
+
+<!-- Right-Side Drawer (Slide-in Panel): Catat Pengeluaran Operasional -->
+<div class="offcanvas offcanvas-end drawer-lg" tabindex="-1" id="createExpenseDrawer" aria-labelledby="createExpenseDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2" id="createExpenseDrawerLabel">
+            <i class="bi bi-wallet2 text-primary-teal"></i> Catat Pengeluaran Baru
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+    </div>
+    <form action="{{ route('dashboard.expenses.store') }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column h-100">
+        @csrf
+        <input type="hidden" name="_drawer_id" value="createExpenseDrawer">
+
+        <div class="offcanvas-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Cabang Properti <span class="text-danger">*</span></label>
+                    <select name="property_id" class="form-select form-select-sm @error('property_id') is-invalid @enderror" required>
+                        <option value="">-- Pilih Properti --</option>
+                        @foreach($properties as $prop)
+                            <option value="{{ $prop->id }}" {{ old('property_id') == $prop->id ? 'selected' : '' }}>
+                                {{ $prop->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Kategori Pengeluaran <span class="text-danger">*</span></label>
+                    <select name="expense_category_id" class="form-select form-select-sm @error('expense_category_id') is-invalid @enderror" required>
+                        <option value="">-- Pilih Kategori --</option>
+                        @foreach($categories as $cat)
+                            <option value="{{ $cat->id }}" {{ old('expense_category_id') == $cat->id ? 'selected' : '' }}>
+                                {{ $cat->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('expense_category_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold">Judul Pengeluaran / Keterangan Singkat <span class="text-danger">*</span></label>
+                    <input type="text" name="title" class="form-control form-control-sm @error('title') is-invalid @enderror"
+                           placeholder="Contoh: Pembelian token listrik kos cabang melati" value="{{ old('title') }}" required>
+                    @error('title') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Vendor / Toko / Penerima</label>
+                    <input type="text" name="vendor_name" class="form-control form-control-sm @error('vendor_name') is-invalid @enderror"
+                           placeholder="Contoh: Toko Bangunan Berkah" value="{{ old('vendor_name') }}">
+                    @error('vendor_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Nominal Biaya (Rp) <span class="text-danger">*</span></label>
+                    <input type="number" step="0.01" min="1" name="amount" class="form-control form-control-sm @error('amount') is-invalid @enderror"
+                           placeholder="0" value="{{ old('amount') }}" required>
+                    @error('amount') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Tanggal Pengeluaran <span class="text-danger">*</span></label>
+                    <input type="date" name="expense_date" class="form-control form-control-sm @error('expense_date') is-invalid @enderror"
+                           value="{{ old('expense_date', date('Y-m-d')) }}" required>
+                    @error('expense_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Rencana Metode Bayar</label>
+                    <select name="payment_method" class="form-select form-select-sm @error('payment_method') is-invalid @enderror">
+                        <option value="cash" {{ old('payment_method') == 'cash' ? 'selected' : '' }}>Tunai / Kas Kecil</option>
+                        <option value="bank_transfer" {{ old('payment_method') == 'bank_transfer' ? 'selected' : '' }}>Transfer Bank</option>
+                        <option value="qris" {{ old('payment_method') == 'qris' ? 'selected' : '' }}>QRIS / E-Wallet</option>
+                        <option value="other" {{ old('payment_method') == 'other' ? 'selected' : '' }}>Lainnya</option>
+                    </select>
+                    @error('payment_method') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold">Bukti Nota / Kuitansi (JPG, PNG, WebP, PDF maks 5MB)</label>
+                    <input type="file" name="receipt" class="form-control form-control-sm @error('receipt') is-invalid @enderror"
+                           accept="image/jpeg,image/png,image/webp,application/pdf">
+                    @error('receipt') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold">Catatan Tambahan</label>
+                    <textarea name="notes" rows="3" class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                              placeholder="Rincian barang/jasa atau rincian pos pengeluaran...">{{ old('notes') }}</textarea>
+                    @error('notes') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+            </div>
+        </div>
+
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">Batal</button>
+            <button type="submit" name="action_type" value="draft" class="btn btn-secondary btn-sm">
+                <i class="bi bi-save me-1"></i>Simpan Draft
+            </button>
+            <button type="submit" name="action_type" value="submit" class="btn btn-primary-teal btn-sm">
+                <i class="bi bi-send-check me-1"></i>Ajukan Persetujuan
+            </button>
+        </div>
+    </form>
 </div>
 @endsection

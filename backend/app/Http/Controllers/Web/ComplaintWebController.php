@@ -33,14 +33,14 @@ class ComplaintWebController extends Controller
         ];
 
         if ($user->isSuperAdmin()) {
-            $properties = Property::active()->get();
+            $properties = Property::with('rooms')->active()->get();
         } elseif ($user->isTenant()) {
             $propertyIds = Booking::where('user_id', $user->id)
                 ->whereIn('status', ['confirmed', 'active', 'checked_in'])
                 ->pluck('property_id');
-            $properties = Property::whereIn('id', $propertyIds)->active()->get();
+            $properties = Property::whereIn('id', $propertyIds)->with('rooms')->active()->get();
         } else {
-            $properties = $user->properties()->active()->get();
+            $properties = $user->properties()->with('rooms')->active()->get();
         }
 
         return view('dashboard.complaints.index', compact('complaints', 'properties', 'filters', 'counts'));

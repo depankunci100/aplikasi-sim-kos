@@ -2,80 +2,385 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../auth/models/user_model.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../invoices/providers/invoice_provider.dart';
 import '../models/property_model.dart';
 import '../providers/property_provider.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final propertiesAsync = ref.watch(propertiesProvider);
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  int _currentNavIndex = 0;
+
+  String _getTimeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 11) return 'Selamat Pagi';
+    if (hour < 15) return 'Selamat Siang';
+    if (hour < 18) return 'Selamat Sore';
+    return 'Selamat Malam';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final propertiesAsync = ref.watch(propertiesProvider);
+    final invoicesAsync = ref.watch(invoicesProvider);
+
+    final isCustomerOrTenant = (user == null || user.isTenant);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'SIM Kos & Guesthouse',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              authState.user != null ? 'Halo, ${authState.user!.name}' : 'Temukan Hunian Nyaman',
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-          ],
+      backgroundColor: AppColors.primary,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            ref.invalidate(propertiesProvider);
+            ref.invalidate(invoicesProvider);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: isCustomerOrTenant
+                ? _buildCustomerView(context, user, invoicesAsync)
+                : _buildAdminView(context, user, propertiesAsync),
+          ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.speed_rounded),
-            tooltip: 'Meter Utilitas',
-            onPressed: () => context.push('/utilities'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.fact_check_rounded),
-            tooltip: 'Inspeksi Kamar',
-            onPressed: () => context.push('/inspections'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long_rounded),
-            tooltip: 'Tagihan & Pembayaran',
-            onPressed: () => context.push('/invoices'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline_rounded),
-            onPressed: () => context.push('/profile'),
-          ),
-        ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(propertiesProvider);
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
+      bottomNavigationBar: _buildBottomNavigationBar(context, isCustomerOrTenant),
+    );
+  }
+
+  // =========================================================================
+  // SCREEN 1: ADMIN / OPERATIONAL VIEW (Selamat Pagi Admin 👋)
+  // =========================================================================
+  Widget _buildAdminView(
+    BuildContext context,
+    UserModel? user,
+    AsyncValue<List<PropertyModel>> propertiesAsync,
+  ) {
+    final totalRooms = propertiesAsync.value?.fold<int>(0, (sum, p) => sum + p.totalRooms) ?? 24;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Top Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero Banner
+              // Greeting Row with Action Icons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_getTimeGreeting()} Admin 👋',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Kelola layanan, pelanggan, dan pembayaran kos dengan mudah.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Row(
+                    children: [
+                      _buildHeaderIconButton(
+                        icon: Icons.notifications_none_rounded,
+                        tooltip: 'Notifikasi',
+                        onTap: () => context.push('/notifications'),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildHeaderIconButton(
+                        icon: Icons.person_outline_rounded,
+                        tooltip: 'Profil',
+                        onTap: () => context.push('/profile'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // 2x2 Floating Stat Cards Row 1
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildAdminStatCard(
+                      icon: Icons.people_alt_rounded,
+                      iconBgColor: const Color(0xFFCCFBF1),
+                      iconColor: AppColors.primary,
+                      title: 'Total Pelanggan',
+                      value: '140',
+                      onTap: () => context.push('/bookings'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildAdminStatCard(
+                      icon: Icons.water_drop_rounded,
+                      iconBgColor: const Color(0xFFCCFBF1),
+                      iconColor: AppColors.primary,
+                      title: 'Total Layanan',
+                      value: '$totalRooms',
+                      onTap: () => _showServicesModal(context),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // 2x2 Floating Stat Cards Row 2
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildAdminStatCard(
+                      icon: Icons.pie_chart_rounded,
+                      iconBgColor: const Color(0xFFCCFBF1),
+                      iconColor: AppColors.primary,
+                      title: 'Perlu Verifikasi',
+                      value: '140',
+                      onTap: () => context.push('/invoices'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildAdminStatCard(
+                      icon: Icons.attach_money_rounded,
+                      iconBgColor: const Color(0xFFCCFBF1),
+                      iconColor: AppColors.primary,
+                      title: 'Total Pemasukan',
+                      value: '10.000',
+                      onTap: () => context.push('/finance/dashboard'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // White Curved Container (Menu Cepat & Aktifitas Terbaru)
+        Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Menu Cepat
+              const Text(
+                'Menu Cepat',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildQuickActionBtn(
+                    icon: Icons.person_add_alt_1_rounded,
+                    label: 'Customer',
+                    onTap: () => context.push('/bookings'),
+                  ),
+                  _buildQuickActionBtn(
+                    icon: Icons.water_drop_rounded,
+                    label: 'Layanan',
+                    onTap: () => _showServicesModal(context),
+                  ),
+                  _buildQuickActionBtn(
+                    icon: Icons.post_add_rounded,
+                    label: 'Tagihan',
+                    onTap: () => context.push('/invoices'),
+                  ),
+                  _buildQuickActionBtn(
+                    icon: Icons.verified_rounded,
+                    label: 'Verifikasi',
+                    onTap: () => context.push('/inspections'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+
+              // Aktifitas Terbaru
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Aktifitas Terbaru',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => context.push('/notifications'),
+                    child: const Text(
+                      'Lihat Semua',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // List of activities matching the image
+              _buildActivityItem(
+                icon: Icons.person_rounded,
+                iconBgColor: const Color(0xFFCCFBF1),
+                iconColor: AppColors.primary,
+                title: 'Pelanggan baru: Aditya',
+                time: '5 menit lalu',
+                onTap: () => context.push('/bookings'),
+              ),
+              const SizedBox(height: 12),
+              _buildActivityItem(
+                icon: Icons.description_rounded,
+                iconBgColor: const Color(0xFFCCFBF1),
+                iconColor: AppColors.primary,
+                title: 'Tagihan baru: Royan',
+                time: '8 menit lalu',
+                onTap: () => context.push('/invoices'),
+              ),
+              const SizedBox(height: 12),
+              _buildActivityItem(
+                icon: Icons.pie_chart_rounded,
+                iconBgColor: const Color(0xFFCCFBF1),
+                iconColor: AppColors.primary,
+                title: 'Pembayaran pending: Rafael',
+                time: '15 menit lalu',
+                onTap: () => context.push('/invoices'),
+              ),
+              const SizedBox(height: 12),
+              _buildActivityItem(
+                icon: Icons.check_circle_rounded,
+                iconBgColor: const Color(0xFFCCFBF1),
+                iconColor: AppColors.primary,
+                title: 'Pembayaran terverifikasi: Zulkarnaen',
+                time: '32 menit lalu',
+                onTap: () => context.push('/invoices'),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =========================================================================
+  // SCREEN 2: CUSTOMER / TENANT VIEW (Halo Customer 👋)
+  // =========================================================================
+  Widget _buildCustomerView(
+    BuildContext context,
+    UserModel? user,
+    AsyncValue<dynamic> invoicesAsync,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Top Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Greeting Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user != null ? 'Halo ${user.name} 👋' : 'Halo Customer 👋',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Pantau penggunaan air, cek tagihan bulanan, layanan kos secara praktis',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Row(
+                    children: [
+                      _buildHeaderIconButton(
+                        icon: Icons.notifications_none_rounded,
+                        tooltip: 'Pengumuman & Notifikasi',
+                        onTap: () => context.push('/announcements'),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildHeaderIconButton(
+                        icon: Icons.person_outline_rounded,
+                        tooltip: 'Profil',
+                        onTap: () => context.push('/profile'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Big White Hero Card: Total Tagihan
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withAlpha(50),
-                      blurRadius: 10,
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),
                   ],
@@ -83,356 +388,699 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(50),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Pilihan Kos & Harian Terlengkap',
-                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
+                    // Row: Title and Status Badge
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total Tagihan',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEE2E2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Belum Lunas',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Cari Kamar Kos atau Sewa Penginapan Harian',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Fasilitas lengkap, listrik transparan, dan proses check-in mudah.',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    const SizedBox(height: 10),
+
+                    // Row: Nominal & Bayar Button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Rp 224.000',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              '24 Mei 2026',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Penggunaan: 16 m³',
+                              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                            ),
+                          ],
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () => context.push('/invoices'),
+                          child: const Text(
+                            'Bayar',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Quick Action Card for Invoices
-              InkWell(
-                onTap: () => context.push('/invoices'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withAlpha(15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary.withAlpha(60)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tagihan Sewa & Bukti Pembayaran',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Cek tagihan aktif, konfirmasi sisa saldo, dan kirim bukti transfer',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Quick Action Card for Inspeksi Kamar
-              InkWell(
-                onTap: () => context.push('/inspections'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.withAlpha(80)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.fact_check_rounded, color: Colors.orange, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Inspeksi & Checklist Kamar',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.brown),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Cek serah terima check-in, setujui checklist kondisi, atau laporkan keberatan',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.orange),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Quick Action Card for Utilitas & Meteran
-              InkWell(
-                onTap: () => context.push('/utilities'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.teal.withAlpha(80)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.speed_rounded, color: Colors.teal, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Utilitas & Meteran Listrik/Air',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Catat meteran kamar, pantau pemakaian kWh/m³, dan cek rincian tagihan',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.teal),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Quick Action Card for Maintenance
-              InkWell(
-                onTap: () => context.push('/maintenance'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.withAlpha(80)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.build_rounded, color: Colors.blue, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Perbaikan & Maintenance',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Lapor AC bocor, kelistrikan, pipa, atau perabot rusak',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.blue),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Quick Action Card for Complaints
-              InkWell(
-                onTap: () => context.push('/complaints'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.purple.withAlpha(80)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.support_agent_rounded, color: Colors.purple, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Keluhan & Layanan Tenant',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Sampaikan keluhan fasilitas, layanan staf, lingkungan, atau tagihan',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.purple),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Quick Action Card for Housekeeping
-              InkWell(
-                onTap: () => context.push('/housekeeping'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withAlpha(25),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.withAlpha(80)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.cleaning_services_rounded, color: Colors.orange, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Jadwal Kebersihan (Housekeeping)',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Pembersihan kamar, ganti sprei, dan checklist area bersama',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.orange),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Quick Action Card for Finance & Expenses
-              InkWell(
-                onTap: () => context.push('/finance/dashboard'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green.withAlpha(80)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.account_balance_wallet_rounded, color: Colors.green, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Keuangan & Pengeluaran',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Dashboard arus kas, approval biaya, dan laporan keuangan',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.green),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Title Section
+              // 2 Cards Row: Belum Lunas & Sudah Lunas
               Row(
+                children: [
+                  Expanded(
+                    child: _buildCustomerCounterCard(
+                      icon: Icons.note_alt_rounded,
+                      iconColor: AppColors.primary,
+                      label: 'Belum Lunas',
+                      value: '1',
+                      onTap: () => context.push('/invoices'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildCustomerCounterCard(
+                      icon: Icons.assignment_turned_in_rounded,
+                      iconColor: AppColors.primary,
+                      label: 'Sudah Lunas',
+                      value: '4',
+                      onTap: () => context.push('/invoices'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // White Curved Container (Tagihan per Bulan & Tagihan Terbaru)
+        Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tagihan per Bulan Header
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Daftar Properti & Cabang',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const Text(
-                    'Semua Kota',
+                    'Tagihan per Bulan',
                     style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    '5 Bulan Terakhir',
+                    style: TextStyle(
+                      fontSize: 12,
                       color: AppColors.primary,
-                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-              // Property List
-              propertiesAsync.when(
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
+              // Mini Bar Chart matching the image
+              _buildMonthlyBarChart(),
+              const SizedBox(height: 28),
+
+              // Tagihan Terbaru
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Tagihan Terbaru',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                ),
-                error: (err, stack) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Text('Gagal memuat data properti: $err'),
-                  ),
-                ),
-                data: (properties) {
-                  if (properties.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Text('Belum ada properti tersedia.'),
+                  GestureDetector(
+                    onTap: () => context.push('/invoices'),
+                    child: const Text(
+                      'Lihat Semua',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
                       ),
-                    );
-                  }
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
 
-                  return ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: properties.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (context, index) {
-                      final prop = properties[index];
-                      return _PropertyCard(property: prop);
-                    },
-                  );
+              // List of Recent Invoices
+              _buildCustomerInvoiceItem(
+                monthYear: 'Mei 2026',
+                usageInfo: 'Penggunaan: 24m³',
+                amount: 'Rp 84.000',
+                isPaid: true,
+                onTap: () => context.push('/invoices'),
+              ),
+              const SizedBox(height: 12),
+              _buildCustomerInvoiceItem(
+                monthYear: 'April 2026',
+                usageInfo: 'Penggunaan: 20m³',
+                amount: 'Rp 50.000',
+                isPaid: false,
+                onTap: () => context.push('/invoices'),
+              ),
+              const SizedBox(height: 12),
+              _buildCustomerInvoiceItem(
+                monthYear: 'Maret 2026',
+                usageInfo: 'Penggunaan: 20m³',
+                amount: 'Rp 64.000',
+                isPaid: true,
+                onTap: () => context.push('/invoices'),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =========================================================================
+  // SUB-COMPONENTS & WIDGETS
+  // =========================================================================
+
+  Widget _buildHeaderIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminStatCard({
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required String title,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerCounterCard({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 26),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionBtn({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFCCFBF1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityItem({
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required String title,
+    required String time,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    time,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonthlyBarChart() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 100,
+            child: Stack(
+              children: [
+                // Horizontal Guidelines
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(height: 1, color: const Color(0xFFE2E8F0)),
+                    Container(height: 1, color: const Color(0xFFE2E8F0)),
+                    Container(height: 1, color: const Color(0xFFE2E8F0)),
+                  ],
+                ),
+                // 5 Bars Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _buildBar(height: 40, isHighlighted: false),
+                    _buildBar(height: 70, isHighlighted: false),
+                    _buildBar(height: 55, isHighlighted: false),
+                    _buildBar(height: 45, isHighlighted: false),
+                    _buildBar(height: 95, isHighlighted: true),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Text('Jan', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              Text('Feb', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              Text('Mar', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              Text('Apr', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              Text('Mei', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBar({required double height, required bool isHighlighted}) {
+    return Container(
+      width: 32,
+      height: height,
+      decoration: BoxDecoration(
+        color: isHighlighted ? AppColors.primary : const Color(0xFFE2E8F0),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+      ),
+    );
+  }
+
+  Widget _buildCustomerInvoiceItem({
+    required String monthYear,
+    required String usageInfo,
+    required String amount,
+    required bool isPaid,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFCCFBF1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.calendar_month_rounded, color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    monthYear,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    usageInfo,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  amount,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isPaid ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    isPaid ? 'Lunas' : 'Belum Lunas',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isPaid ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // BOTTOM NAVIGATION BAR
+  // =========================================================================
+  Widget _buildBottomNavigationBar(BuildContext context, bool isCustomer) {
+    if (isCustomer) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(
+                  icon: Icons.home_rounded,
+                  label: 'Beranda',
+                  isSelected: _currentNavIndex == 0,
+                  onTap: () => setState(() => _currentNavIndex = 0),
+                ),
+                _buildNavItem(
+                  icon: Icons.room_service_outlined,
+                  label: 'Layanan',
+                  isSelected: _currentNavIndex == 1,
+                  onTap: () {
+                    setState(() => _currentNavIndex = 1);
+                    context.push('/room-services');
+                  },
+                ),
+                _buildNavItem(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Tagihan',
+                  isSelected: _currentNavIndex == 2,
+                  onTap: () {
+                    setState(() => _currentNavIndex = 2);
+                    context.push('/invoices');
+                  },
+                ),
+                _buildNavItem(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Profil',
+                  isSelected: _currentNavIndex == 3,
+                  onTap: () {
+                    setState(() => _currentNavIndex = 3);
+                    context.push('/profile');
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Admin / Staff Bottom Nav Bar
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                icon: Icons.home_rounded,
+                label: 'Beranda',
+                isSelected: _currentNavIndex == 0,
+                onTap: () => setState(() => _currentNavIndex = 0),
+              ),
+              _buildNavItem(
+                icon: Icons.people_outline_rounded,
+                label: 'Penghuni',
+                isSelected: _currentNavIndex == 1,
+                onTap: () {
+                  setState(() => _currentNavIndex = 1);
+                  context.push('/bookings');
+                },
+              ),
+              _buildNavItem(
+                icon: Icons.water_drop_outlined,
+                label: 'Layanan',
+                isSelected: _currentNavIndex == 2,
+                onTap: () {
+                  setState(() => _currentNavIndex = 2);
+                  _showServicesModal(context);
+                },
+              ),
+              _buildNavItem(
+                icon: Icons.receipt_outlined,
+                label: 'Tagihan',
+                isSelected: _currentNavIndex == 3,
+                onTap: () {
+                  setState(() => _currentNavIndex = 3);
+                  context.push('/invoices');
+                },
+              ),
+              _buildNavItem(
+                icon: Icons.person_outline_rounded,
+                label: 'Profil',
+                isSelected: _currentNavIndex == 4,
+                onTap: () {
+                  setState(() => _currentNavIndex = 4);
+                  context.push('/profile');
                 },
               ),
             ],
@@ -441,135 +1089,108 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
-}
 
-class _PropertyCard extends StatelessWidget {
-  final PropertyModel property;
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    const activeColor = AppColors.primary;
+    const inactiveColor = Color(0xFF94A3B8);
 
-  const _PropertyCard({required this.property});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          context.push('/property/${property.id}', extra: property);
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(25),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.apartment_rounded,
-                      color: AppColors.primary,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withAlpha(25),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            property.typeLabel,
-                            style: const TextStyle(
-                              color: AppColors.secondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          property.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                '${property.city} • ${property.address}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? activeColor : inactiveColor,
+              size: 24,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? activeColor : inactiveColor,
               ),
-              const SizedBox(height: 14),
-              const Divider(height: 1, color: AppColors.border),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: property.availableRooms > 0 ? AppColors.success : AppColors.danger,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${property.availableRooms} Kamar Kosong',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: property.availableRooms > 0 ? AppColors.success : AppColors.danger,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Row(
-                    children: [
-                      Text(
-                        'Lihat Kamar',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.primary),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Bottom Sheet Layanan Lengkap (Housekeeping, Utilitas, Maintenance, Inspeksi)
+  void _showServicesModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pilih Layanan Operasional Kos',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.room_service_rounded, color: AppColors.primary),
+              title: const Text('Layanan Kamar (Inspeksi & Pembersihan)'),
+              subtitle: const Text('Pengajuan dan pemantauan layanan unit hunian'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/room-services');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.speed_rounded, color: AppColors.primary),
+              title: const Text('Catat Meteran Listrik & Air'),
+              subtitle: const Text('Input angka meter kWh dan m³ bulanan'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/utilities');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.cleaning_services_rounded, color: Colors.teal),
+              title: const Text('Tugas Housekeeping'),
+              subtitle: const Text('Jadwal & checklist pembersihan kamar'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/housekeeping');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.build_rounded, color: Colors.blue),
+              title: const Text('Maintenance & Perbaikan'),
+              subtitle: const Text('Tiket kendala teknis dan fasilitas'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/maintenance');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.fact_check_rounded, color: Colors.orange),
+              title: const Text('Inspeksi Kamar (Check-in / Check-out)'),
+              subtitle: const Text('Pemeriksaan kondisi fisik kamar'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/inspections');
+              },
+            ),
+          ],
         ),
       ),
     );

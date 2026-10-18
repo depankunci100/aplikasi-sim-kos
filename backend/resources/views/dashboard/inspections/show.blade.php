@@ -266,13 +266,27 @@
                 </h6>
             </div>
             <div class="card-body p-3 small">
-                <div class="mb-2">
-                    <span class="text-muted d-block">Petugas Lapangan:</span>
-                    <strong class="text-dark">{{ $inspection->inspector->name ?? 'Belum Ditugaskan' }}</strong>
+                <div class="mb-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted d-block">Petugas Lapangan:</span>
+                        <strong class="text-dark">{{ $inspection->inspector->name ?? 'Belum Ditugaskan' }}</strong>
+                    </div>
+                    @if(auth()->user()->isSuperAdmin() || auth()->user()->hasRole('owner') || auth()->user()->hasRole('manager'))
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignInspectorModal">
+                        <i class="bi bi-person-plus me-1"></i>Tugaskan
+                    </button>
+                    @endif
                 </div>
-                <div class="mb-2">
-                    <span class="text-muted d-block">Jadwal Tanggal:</span>
-                    <strong class="text-dark">{{ $inspection->scheduled_date->format('d M Y') }}</strong>
+                <div class="mb-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted d-block">Jadwal Tanggal:</span>
+                        <strong class="text-dark">{{ $inspection->scheduled_date->format('d M Y') }}</strong>
+                    </div>
+                    @if(!$inspection->isCompleted() && !$inspection->isApproved() && (auth()->user()->isSuperAdmin() || auth()->user()->hasRole('owner') || auth()->user()->hasRole('manager')))
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rescheduleInspectionModal">
+                        <i class="bi bi-calendar-event me-1"></i>Ubah
+                    </button>
+                    @endif
                 </div>
                 @if($inspection->started_at)
                 <div class="mb-2">
@@ -391,6 +405,70 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-teal btn-sm text-white">Unggah Foto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tugaskan Inspektor -->
+<div class="modal fade" id="assignInspectorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ route('dashboard.inspections.assign', $inspection->id) }}">
+                @csrf
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold">Disposisi Petugas Pemeriksa</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Pilih Petugas Inspektor <span class="text-danger">*</span></label>
+                        <select name="inspector_id" class="form-select" required>
+                            <option value="">-- Pilih Petugas yang Bertugas --</option>
+                            @foreach($propertyStaff as $staff)
+                                <option value="{{ $staff->id }}" {{ $inspection->inspector_id == $staff->id ? 'selected' : '' }}>
+                                    {{ $staff->name }} ({{ ucfirst($staff->role instanceof \BackedEnum ? $staff->role->value : (string) ($staff->role ?? 'staff')) }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="small text-muted bg-light p-2 rounded">
+                        <i class="bi bi-info-circle me-1"></i> Petugas yang ditugaskan akan menerima pemberitahuan otomatis dan dapat mengakses checklist inspeksi di perangkat mobile/web.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Simpan Penugasan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Penjadwalan Ulang Inspeksi -->
+<div class="modal fade" id="rescheduleInspectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ route('dashboard.inspections.reschedule', $inspection->id) }}">
+                @csrf
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold">Jadwalkan Ulang Inspeksi Kamar</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tanggal Baru <span class="text-danger">*</span></label>
+                        <input type="date" name="scheduled_date" class="form-control" value="{{ $inspection->scheduled_date->format('Y-m-d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Alasan Penjadwalan Ulang</label>
+                        <textarea name="reason" class="form-control" rows="2" placeholder="Contoh: Permintaan penyewa atau penyesuaian ketersediaan petugas..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Simpan Perubahan Jadwal</button>
                 </div>
             </form>
         </div>

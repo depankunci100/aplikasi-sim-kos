@@ -71,6 +71,19 @@ class FinancialDashboardScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push('/finance/accounting'),
+                    icon: const Icon(Icons.account_balance_rounded, size: 18),
+                    label: const Text('Buku Jurnal & Neraca Akuntansi'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.secondary,
+                      side: BorderSide(color: AppColors.secondary.withOpacity(0.5)),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
 
                 // Primary 4 KPI Grid

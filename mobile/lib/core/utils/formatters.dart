@@ -29,4 +29,8 @@ class Formatters {
       return '${date.day}-${date.month}-${date.year}';
     }
   }
+
+  static String formatDate(DateTime? date) => toShortDate(date);
+  static String date(DateTime? date) => toShortDate(date);
+  static String currency(num? amount) => toRupiah(amount);
 }

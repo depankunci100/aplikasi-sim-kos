@@ -8,10 +8,10 @@
         <h3 class="fw-bold mb-1"><i class="bi bi-chat-left-dots text-primary-teal me-2"></i>Keluhan & Pengaduan Penyewa</h3>
         <p class="text-muted mb-0">Pantau tiket keluhan penyewa, berikan respon cepat, dan tindak lanjuti penyelesaian.</p>
     </div>
-    <a href="{{ route('dashboard.complaints.create') }}" class="btn btn-primary-teal d-flex align-items-center gap-2">
+    <button type="button" class="btn btn-primary-teal d-flex align-items-center gap-2" data-bs-toggle="offcanvas" data-bs-target="#createComplaintDrawer" aria-controls="createComplaintDrawer">
         <i class="bi bi-plus-circle"></i>
         <span>Kirim Keluhan Baru</span>
-    </a>
+    </button>
 </div>
 
 <!-- KPI Summary Cards -->
@@ -237,4 +237,124 @@
     </div>
     @endif
 </div>
+
+<!-- Right-Side Drawer: Kirim Keluhan Baru -->
+<div class="offcanvas offcanvas-end drawer-lg" tabindex="-1" id="createComplaintDrawer" aria-labelledby="createComplaintDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2" id="createComplaintDrawerLabel">
+            <i class="bi bi-chat-left-dots text-primary-teal"></i> Kirim Keluhan / Pengaduan
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+    </div>
+    <form action="{{ route('dashboard.complaints.store') }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column h-100">
+        @csrf
+        <input type="hidden" name="_drawer_id" value="createComplaintDrawer">
+
+        <div class="offcanvas-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Properti <span class="text-danger">*</span></label>
+                    <select name="property_id" id="drawerComplaintPropertySelect" class="form-select form-select-sm @error('property_id') is-invalid @enderror" required>
+                        <option value="">-- Pilih Properti --</option>
+                        @foreach($properties as $prop)
+                            <option value="{{ $prop->id }}" {{ old('property_id') == $prop->id ? 'selected' : '' }} data-rooms='@json($prop->rooms)'>
+                                {{ $prop->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Kamar (Opsional)</label>
+                    <select name="room_id" id="drawerComplaintRoomSelect" class="form-select form-select-sm @error('room_id') is-invalid @enderror">
+                        <option value="">Fasilitas Umum / Lingkungan</option>
+                    </select>
+                    @error('room_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Kategori Keluhan <span class="text-danger">*</span></label>
+                    <select name="category" class="form-select form-select-sm @error('category') is-invalid @enderror" required>
+                        @foreach(\App\Enums\ComplaintCategory::cases() as $cat)
+                            <option value="{{ $cat->value }}" {{ old('category') == $cat->value ? 'selected' : '' }}>
+                                {{ $cat->label() }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('category') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Tingkat Prioritas</label>
+                    <select name="priority" class="form-select form-select-sm @error('priority') is-invalid @enderror">
+                        <option value="low" {{ old('priority') == 'low' ? 'selected' : '' }}>Rendah</option>
+                        <option value="normal" {{ (old('priority', 'normal')) == 'normal' ? 'selected' : '' }}>Normal</option>
+                        <option value="high" {{ old('priority') == 'high' ? 'selected' : '' }}>Tinggi</option>
+                        <option value="urgent" {{ old('priority') == 'urgent' ? 'selected' : '' }}>Darurat</option>
+                    </select>
+                    @error('priority') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Judul Keluhan <span class="text-danger">*</span></label>
+                    <input type="text" name="title" class="form-control form-control-sm @error('title') is-invalid @enderror" value="{{ old('title') }}" placeholder="Contoh: Air panas di kamar mandi tidak menyala" required>
+                    @error('title') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Deskripsi Keluhan <span class="text-danger">*</span></label>
+                    <textarea name="description" rows="3" class="form-control form-control-sm @error('description') is-invalid @enderror" placeholder="Jelaskan secara rinci permasalahan yang dialami..." required>{{ old('description') }}</textarea>
+                    @error('description') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold small">Foto Lampiran Bukti (Opsional, format JPG/PNG/WebP maks 5MB)</label>
+                    <input type="file" name="photos[]" class="form-control form-control-sm @error('photos') is-invalid @enderror" multiple accept="image/jpeg,image/png,image/webp">
+                    @error('photos') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+            </div>
+        </div>
+
+        <div class="offcanvas-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">Batal</button>
+            <button type="submit" class="btn btn-primary-teal btn-sm px-3">
+                <i class="bi bi-send me-1"></i> Kirim Keluhan
+            </button>
+        </div>
+    </form>
+</div>
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const propSelect = document.getElementById('drawerComplaintPropertySelect');
+        const roomSelect = document.getElementById('drawerComplaintRoomSelect');
+
+        if (propSelect && roomSelect) {
+            function updateRooms() {
+                const selectedOpt = propSelect.options[propSelect.selectedIndex];
+                roomSelect.innerHTML = '<option value="">Fasilitas Umum / Lingkungan</option>';
+
+                if (!selectedOpt || !selectedOpt.dataset.rooms) return;
+
+                try {
+                    const rooms = JSON.parse(selectedOpt.dataset.rooms);
+                    rooms.forEach(room => {
+                        const opt = document.createElement('option');
+                        opt.value = room.id;
+                        opt.textContent = 'Kamar ' + room.room_number + (room.name ? ' (' + room.name + ')' : '');
+                        roomSelect.appendChild(opt);
+                    });
+                } catch(e) {
+                    console.error("Gagal parse rooms data", e);
+                }
+            }
+
+            propSelect.addEventListener('change', updateRooms);
+            updateRooms();
+        }
+    });
+</script>
+@endpush
 @endsection

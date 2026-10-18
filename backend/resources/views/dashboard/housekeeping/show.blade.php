@@ -39,6 +39,9 @@
             <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assignModal">
                 <i class="bi bi-person-plus me-1"></i>{{ $task->assigned_to ? 'Tugaskan Ulang' : 'Tugaskan Staf' }}
             </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#rescheduleModal">
+                <i class="bi bi-calendar-event me-1"></i>Jadwal Ulang
+            </button>
         @endif
 
         @if($task->status->value === 'assigned' && ($task->assigned_to === auth()->id() || auth()->user()->isSuperAdmin() || auth()->user()->hasRole('manager') || auth()->user()->hasRole('owner') || auth()->user()->hasRole('staff')))
@@ -402,6 +405,41 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
                 <button type="submit" class="btn btn-danger">Batalkan Tugas</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Jadwal Ulang -->
+<div class="modal fade" id="rescheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ route('dashboard.housekeeping.reschedule', $task->id) }}" method="POST" class="modal-content">
+            @csrf
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Jadwalkan Ulang Kebersihan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Tanggal Baru <span class="text-danger">*</span></label>
+                    <input type="date" name="scheduled_date" class="form-control" value="{{ $task->scheduled_date->format('Y-m-d') }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Slot Waktu Baru</label>
+                    <select name="scheduled_slot" class="form-select">
+                        <option value="Pagi (08:00 - 11:00)" {{ $task->scheduled_slot == 'Pagi (08:00 - 11:00)' ? 'selected' : '' }}>Pagi (08:00 - 11:00)</option>
+                        <option value="Siang (13:00 - 15:00)" {{ $task->scheduled_slot == 'Siang (13:00 - 15:00)' ? 'selected' : '' }}>Siang (13:00 - 15:00)</option>
+                        <option value="Sore (15:00 - 17:00)" {{ $task->scheduled_slot == 'Sore (15:00 - 17:00)' ? 'selected' : '' }}>Sore (15:00 - 17:00)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Alasan Penjadwalan Ulang</label>
+                    <textarea name="reason" class="form-control" rows="2" placeholder="Catatan atau alasan perubahan tanggal..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="submit" class="btn btn-primary">Simpan Jadwal Baru</button>
             </div>
         </form>
     </div>

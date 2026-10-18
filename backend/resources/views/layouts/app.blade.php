@@ -374,6 +374,72 @@
         .badge-status-pending { background-color: #f59e0b; color: #fff; }
         .badge-status-verified { background-color: #10b981; color: #fff; }
         .badge-status-rejected { background-color: #64748b; color: #fff; }
+
+        /* Right-Side Drawer (Slide-in Panel) Standard */
+        .offcanvas.offcanvas-end {
+            box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+            border-left: 1px solid #e2e8f0;
+            z-index: 1055;
+        }
+
+        .offcanvas-end.drawer-sm { width: 400px; }
+        .offcanvas-end.drawer-md { width: 520px; }
+        .offcanvas-end.drawer-lg { width: 640px; }
+        .offcanvas-end.drawer-xl { width: 780px; }
+
+        @media (max-width: 576px) {
+            .offcanvas-end.drawer-sm,
+            .offcanvas-end.drawer-md,
+            .offcanvas-end.drawer-lg,
+            .offcanvas-end.drawer-xl {
+                width: 100% !important;
+            }
+        }
+
+        .offcanvas .offcanvas-header {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem 1.25rem;
+            background-color: #ffffff;
+        }
+
+        .offcanvas .offcanvas-body {
+            padding: 1.25rem;
+            background-color: #ffffff;
+            overflow-y: auto;
+        }
+
+        .offcanvas .offcanvas-footer {
+            border-top: 1px solid #e2e8f0;
+            padding: 1rem 1.25rem;
+            background-color: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        /* Action Confirmation Modal Standard */
+        .modal-confirm .modal-content {
+            border: 0;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            overflow: hidden;
+        }
+
+        .modal-confirm .modal-header {
+            padding: 1.25rem 1.5rem 0.75rem;
+            border-bottom: 0;
+        }
+
+        .modal-confirm .modal-body {
+            padding: 0.5rem 1.5rem 1.25rem;
+        }
+
+        .modal-confirm .modal-footer {
+            padding: 0.75rem 1.5rem 1.25rem;
+            border-top: 0;
+            background-color: #f8fafc;
+        }
     </style>
     @stack('styles')
 </head>
@@ -416,6 +482,16 @@
                 <!-- 2. OPERASIONAL SEWA -->
                 <div class="sidebar-section-title">Operasional Sewa</div>
                 <nav class="nav flex-column">
+                    @if(auth()->user()->hasRole('super_admin', 'owner', 'manager', 'receptionist', 'staff'))
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.rooms.*') ? 'active' : '' }}" href="{{ route('dashboard.rooms.index') }}">
+                        <i class="bi bi-door-open link-icon"></i>
+                        <span>Master Kamar</span>
+                    </a>
+                    @endif
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.bookings.*') ? 'active' : '' }}" href="{{ route('dashboard.bookings.index') }}">
+                        <i class="bi bi-calendar-check link-icon"></i>
+                        <span>Pemesanan (Booking)</span>
+                    </a>
                     <a class="sidebar-link {{ request()->routeIs('dashboard.invoices.*') ? 'active' : '' }}" href="{{ route('dashboard.invoices.index') }}">
                         <i class="bi bi-receipt link-icon"></i>
                         <span>Tagihan (Invoice)</span>
@@ -426,6 +502,14 @@
                         <span>Verifikasi Pembayaran</span>
                     </a>
                     @endif
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.deposits.index', 'dashboard.deposits.show') ? 'active' : '' }}" href="{{ route('dashboard.deposits.index') }}">
+                        <i class="bi bi-shield-check link-icon"></i>
+                        <span>Uang Jaminan (Deposit)</span>
+                    </a>
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.deposits.settlements.*') ? 'active' : '' }}" href="{{ route('dashboard.deposits.settlements.index') }}">
+                        <i class="bi bi-box-arrow-right link-icon"></i>
+                        <span>Penyelesaian Check-Out</span>
+                    </a>
                 </nav>
 
                 <!-- 3. UTILITAS & METERAN -->
@@ -481,6 +565,10 @@
                         <i class="bi bi-clipboard2-check link-icon"></i>
                         <span>Inspeksi Kamar</span>
                     </a>
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.assets.*') ? 'active' : '' }}" href="{{ route('dashboard.assets.index') }}">
+                        <i class="bi bi-box-seam link-icon"></i>
+                        <span>Aset & Inventaris</span>
+                    </a>
                     @endif
                     <a class="sidebar-link {{ request()->routeIs('dashboard.maintenance.*') ? 'active' : '' }}" href="{{ route('dashboard.maintenance.index') }}">
                         <i class="bi bi-tools link-icon"></i>
@@ -493,6 +581,10 @@
                     <a class="sidebar-link {{ request()->routeIs('dashboard.housekeeping.*') ? 'active' : '' }}" href="{{ route('dashboard.housekeeping.index') }}">
                         <i class="bi bi-stars link-icon"></i>
                         <span>Kebersihan (Housekeeping)</span>
+                    </a>
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.announcements.*') ? 'active' : '' }}" href="{{ route('dashboard.announcements.index') }}">
+                        <i class="bi bi-megaphone link-icon"></i>
+                        <span>Papan Pengumuman</span>
                     </a>
                 </nav>
 
@@ -555,6 +647,66 @@
                                 <a class="sidebar-sublink {{ request()->routeIs('dashboard.reports.operating-summary') ? 'active' : '' }}" href="{{ route('dashboard.reports.operating-summary') }}">
                                     <i class="bi bi-calculator"></i>
                                     <span>Ringkasan Hasil Usaha</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+                @endif
+
+                <!-- 6. AKUNTANSI & JURNAL -->
+                @if(auth()->user()->hasRole('super_admin', 'owner', 'manager', 'receptionist'))
+                @php 
+                    $isAccountingActive = request()->routeIs('dashboard.accounting.*');
+                @endphp
+                <div class="sidebar-section-title">Akuntansi & Jurnal</div>
+                <nav class="nav flex-column">
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.accounting.coa') ? 'active' : '' }}" href="{{ route('dashboard.accounting.coa') }}">
+                        <i class="bi bi-diagram-3 link-icon"></i>
+                        <span>Bagan Akun (COA)</span>
+                    </a>
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.accounting.journals.*') ? 'active' : '' }}" href="{{ route('dashboard.accounting.journals.index') }}">
+                        <i class="bi bi-journal-text link-icon"></i>
+                        <span>Jurnal Umum</span>
+                    </a>
+
+                    <!-- Submenu Laporan Akuntansi -->
+                    <a class="sidebar-link sidebar-group-toggle {{ request()->routeIs('dashboard.accounting.reports.*') ? 'active' : '' }}" 
+                       data-bs-toggle="collapse" 
+                       href="#submenuAccountingReports" 
+                       role="button" 
+                       aria-expanded="{{ request()->routeIs('dashboard.accounting.reports.*') ? 'true' : 'false' }}" 
+                       aria-controls="submenuAccountingReports">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-bank link-icon"></i>
+                            <span>Laporan Keuangan</span>
+                        </div>
+                        <i class="bi bi-chevron-right chevron"></i>
+                    </a>
+                    <div class="collapse {{ request()->routeIs('dashboard.accounting.reports.*') ? 'show' : '' }}" id="submenuAccountingReports">
+                        <ul class="sidebar-submenu">
+                            <li class="sidebar-subitem">
+                                <a class="sidebar-sublink {{ request()->routeIs('dashboard.accounting.reports.trial-balance') ? 'active' : '' }}" href="{{ route('dashboard.accounting.reports.trial-balance') }}">
+                                    <i class="bi bi-scale"></i>
+                                    <span>Neraca Saldo</span>
+                                </a>
+                            </li>
+                            <li class="sidebar-subitem">
+                                <a class="sidebar-sublink {{ request()->routeIs('dashboard.accounting.reports.income-statement') ? 'active' : '' }}" href="{{ route('dashboard.accounting.reports.income-statement') }}">
+                                    <i class="bi bi-graph-up-arrow"></i>
+                                    <span>Laba Rugi</span>
+                                </a>
+                            </li>
+                            <li class="sidebar-subitem">
+                                <a class="sidebar-sublink {{ request()->routeIs('dashboard.accounting.reports.balance-sheet') ? 'active' : '' }}" href="{{ route('dashboard.accounting.reports.balance-sheet') }}">
+                                    <i class="bi bi-safe2"></i>
+                                    <span>Neraca Keuangan</span>
+                                </a>
+                            </li>
+                            <li class="sidebar-subitem">
+                                <a class="sidebar-sublink {{ request()->routeIs('dashboard.accounting.reports.reconciliation') ? 'active' : '' }}" href="{{ route('dashboard.accounting.reports.reconciliation') }}">
+                                    <i class="bi bi-check2-square"></i>
+                                    <span>Rekonsiliasi Subledger</span>
                                 </a>
                             </li>
                         </ul>
@@ -692,7 +844,7 @@
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Sidebar Responsive Toggle Script -->
+    <!-- Sidebar Responsive Toggle & Drawer Utilities Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const toggleBtn = document.getElementById('sidebarToggleBtn');
@@ -733,8 +885,40 @@
                     });
                 });
             }
+
+            // Global Anti-Double Submission Protection for Forms
+            document.addEventListener('submit', function (e) {
+                const form = e.target;
+                if (!form.checkValidity || form.checkValidity()) {
+                    const submitBtns = form.querySelectorAll('button[type="submit"]');
+                    submitBtns.forEach(btn => {
+                        if (!btn.disabled && !btn.classList.contains('no-disable-on-submit')) {
+                            setTimeout(() => {
+                                btn.disabled = true;
+                                if (!btn.hasAttribute('data-original-html')) {
+                                    btn.setAttribute('data-original-html', btn.innerHTML);
+                                }
+                                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Memproses...';
+                            }, 20);
+                        }
+                    });
+                }
+            });
         });
     </script>
+
+    @if(isset($errors) && $errors->any() && old('_drawer_id'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const targetDrawerId = "{{ old('_drawer_id') }}";
+            const targetDrawerEl = document.getElementById(targetDrawerId);
+            if (targetDrawerEl) {
+                const drawerInstance = bootstrap.Offcanvas.getOrCreateInstance(targetDrawerEl);
+                drawerInstance.show();
+            }
+        });
+    </script>
+    @endif
     @stack('scripts')
 </body>
 </html>

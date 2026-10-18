@@ -98,6 +98,9 @@
     </div>
 </div>
 
+<!-- Section: Kalender Okupansi & Ketersediaan Kamar (Slot, Penuh, Akan Checkout) -->
+@include('dashboard.partials.occupancy_calendar')
+
 <!-- Section: Antrean Verifikasi Pembayaran (Fokus Kasir & Owner) -->
 <div class="card mb-4">
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">

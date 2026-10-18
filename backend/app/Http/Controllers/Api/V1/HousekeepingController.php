@@ -111,6 +111,10 @@ class HousekeepingController extends ApiController
         $user = $request->user();
         $task = HousekeepingTask::findOrFail($id);
 
+        if (!$request->has('assigned_to') && $request->has('staff_id')) {
+            $request->merge(['assigned_to' => $request->staff_id]);
+        }
+
         $request->validate([
             'assigned_to' => 'required|exists:users,id',
         ]);
@@ -199,6 +203,84 @@ class HousekeepingController extends ApiController
     }
 
     /**
+     * POST /api/v1/housekeeping/{id}/approve
+     * Konfirmasi penyelesaian hasil kebersihan oleh penyewa ("Sesuai — Konfirmasi Selesai")
+     */
+    public function approve(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $task = HousekeepingTask::findOrFail($id);
+
+        $request->validate([
+            'feedback' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $approved = $this->housekeepingService->tenantApproveTask($task, $request->feedback, $user);
+            return $this->successResponse($approved, 'Hasil pembersihan kamar berhasil dikonfirmasi selesai.');
+        } catch (DomainException $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/housekeeping/{id}/request-revision
+     * Permintaan perbaikan hasil kebersihan oleh penyewa ("Belum Sesuai — Minta Perbaikan")
+     */
+    public function requestRevision(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $task = HousekeepingTask::findOrFail($id);
+
+        $request->validate([
+            'reason' => 'required|string|min:3|max:500',
+            'problematic_items' => 'nullable|array',
+            'problematic_items.*' => 'string|max:100',
+        ]);
+
+        try {
+            $updated = $this->housekeepingService->tenantRequestRevision(
+                $task,
+                $request->reason,
+                $request->problematic_items ?? [],
+                $user
+            );
+            return $this->successResponse($updated, 'Permintaan perbaikan kebersihan telah dikirim ke pengelola dan staf.');
+        } catch (DomainException $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/housekeeping/{id}/reschedule
+     * Penjadwalan ulang tanggal atau slot waktu oleh manajer
+     */
+    public function reschedule(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $task = HousekeepingTask::findOrFail($id);
+
+        $request->validate([
+            'scheduled_date' => 'required|date',
+            'scheduled_slot' => 'nullable|string|max:50',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $rescheduled = $this->housekeepingService->rescheduleTask(
+                $task,
+                $request->scheduled_date,
+                $request->scheduled_slot,
+                $request->reason,
+                $user
+            );
+            return $this->successResponse($rescheduled, 'Jadwal tugas kebersihan berhasil diperbarui.');
+        } catch (DomainException $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
      * POST /api/v1/housekeeping/{id}/cancel
      */
     public function cancel(Request $request, int $id): JsonResponse
@@ -238,6 +320,65 @@ class HousekeepingController extends ApiController
         } catch (DomainException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         }
+    }
+
+    /**
+     * POST /api/v1/housekeeping/request
+     * Pengajuan Pembersihan Kamar oleh Penyewa
+     */
+    public function tenantRequest(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'scheduled_date' => 'nullable|date',
+            'scheduled_slot' => 'nullable|string|max:50',
+            'priority' => 'nullable|in:low,normal,high',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $task = $this->housekeepingService->requestRoomCleaning($user, $request->all());
+            return $this->successResponse($task, 'Pengajuan pembersihan kamar berhasil dikirim ke pengelola.', 201);
+        } catch (DomainException $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/housekeeping/{id}/tenant-cancel
+     * Pembatalan pengajuan oleh penyewa
+     */
+    public function tenantCancel(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $task = $this->housekeepingService->cancelCleaningRequest($id, $user, $request->reason);
+            return $this->successResponse($task, 'Pengajuan pembersihan kamar berhasil dibatalkan.');
+        } catch (DomainException $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * GET /api/v1/tenant/active-room
+     * Ambil data kamar aktif penyewa
+     */
+    public function activeRoom(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $roomInfo = $this->housekeepingService->getActiveRoomForTenant($user);
+
+        if (!$roomInfo) {
+            return $this->successResponse(null, 'Belum ada kamar aktif yang terdaftar untuk akun Anda.');
+        }
+
+        return $this->successResponse($roomInfo, 'Data kamar aktif penyewa berhasil diambil.');
     }
 
     private function handleDomainException(DomainException $e): JsonResponse

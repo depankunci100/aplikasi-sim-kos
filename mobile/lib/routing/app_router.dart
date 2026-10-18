@@ -34,6 +34,23 @@ import '../features/finance/screens/expense_list_screen.dart';
 import '../features/finance/screens/expense_detail_screen.dart';
 import '../features/finance/screens/expense_form_screen.dart';
 import '../features/finance/screens/financial_reports_screen.dart';
+import '../features/booking/models/booking_model.dart';
+import '../features/booking/screens/booking_form_screen.dart';
+import '../features/booking/screens/booking_track_screen.dart';
+import '../features/booking/screens/booking_list_screen.dart';
+import '../features/booking/screens/booking_detail_screen.dart';
+import '../features/deposit/screens/deposit_list_screen.dart';
+import '../features/deposit/screens/deposit_detail_screen.dart';
+import '../features/deposit/screens/settlement_detail_screen.dart';
+import '../features/finance/screens/accounting_hub_screen.dart';
+import '../features/announcements/models/announcement_model.dart';
+import '../features/announcements/screens/announcements_list_screen.dart';
+import '../features/announcements/screens/announcement_detail_screen.dart';
+import '../features/housekeeping/screens/housekeeping_request_screen.dart';
+import '../features/inspections/screens/inspection_request_screen.dart';
+import '../features/profile/screens/identity_verification_screen.dart';
+import '../features/profile/screens/notifications_screen.dart';
+import '../features/profile/screens/room_services_hub_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -200,12 +217,102 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/finance/reports',
         builder: (context, state) => const FinancialReportsScreen(),
       ),
+      GoRoute(
+        path: '/finance/accounting',
+        builder: (context, state) => const AccountingHubScreen(),
+      ),
+      GoRoute(
+        path: '/guest/book',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return BookingFormScreen(
+            roomId: extra['room_id'] as int? ?? 1,
+            propertyName: extra['property_name'] as String? ?? 'Kos Permata Hijau',
+            roomNumber: extra['room_number'] as String? ?? '101',
+            roomTypeName: extra['room_type_name'] as String? ?? 'Deluxe Single',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/guest/track/:token',
+        builder: (context, state) {
+          final token = state.pathParameters['token'] ?? '';
+          final extra = state.extra as Map<String, dynamic>?;
+          return BookingTrackScreen(
+            token: token,
+            initialBookingCode: extra?['booking_code'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/bookings',
+        builder: (context, state) => const BookingListScreen(),
+      ),
+      GoRoute(
+        path: '/bookings/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final booking = state.extra as BookingModel?;
+          return BookingDetailScreen(bookingId: id, initialBooking: booking);
+        },
+      ),
+      GoRoute(
+        path: '/deposits',
+        builder: (context, state) => const DepositListScreen(),
+      ),
+      GoRoute(
+        path: '/deposits/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          return DepositDetailScreen(depositId: id);
+        },
+      ),
+      GoRoute(
+        path: '/settlements/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          return SettlementDetailScreen(settlementId: id);
+        },
+      ),
+      GoRoute(
+        path: '/announcements',
+        builder: (context, state) => const AnnouncementsListScreen(),
+      ),
+      GoRoute(
+        path: '/announcement/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '1') ?? 1;
+          final item = state.extra as AnnouncementModel?;
+          return AnnouncementDetailScreen(announcementId: id, initialAnnouncement: item);
+        },
+      ),
+      GoRoute(
+        path: '/housekeeping/request',
+        builder: (context, state) => const HousekeepingRequestScreen(),
+      ),
+      GoRoute(
+        path: '/inspections/request',
+        builder: (context, state) => const InspectionRequestScreen(),
+      ),
+      GoRoute(
+        path: '/identity/verify',
+        builder: (context, state) => const IdentityVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/room-services',
+        builder: (context, state) => const RoomServicesHubScreen(),
+      ),
     ],
     redirect: (context, state) {
       final isAuth = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == '/login';
+      final isGuestRoute = state.matchedLocation.startsWith('/guest');
 
-      if (!isAuth && !isLoggingIn) {
+      if (!isAuth && !isLoggingIn && !isGuestRoute) {
         return '/login';
       }
 

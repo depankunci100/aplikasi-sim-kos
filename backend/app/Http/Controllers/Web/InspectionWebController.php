@@ -153,7 +153,14 @@ class InspectionWebController extends Controller
             ->latest('scheduled_date')
             ->get();
 
-        return view('dashboard.inspections.show', compact('inspection', 'previousInspections'));
+        $propertyStaff = $inspection->property->users()
+            ->whereIn('property_users.role', ['staff', 'manager', 'owner', 'receptionist'])
+            ->get();
+        if ($propertyStaff->isEmpty()) {
+            $propertyStaff = User::whereIn('role', ['manager', 'staff', 'receptionist'])->where('is_active', true)->get();
+        }
+
+        return view('dashboard.inspections.show', compact('inspection', 'previousInspections', 'propertyStaff'));
     }
 
     public function start(int $id): RedirectResponse
@@ -311,5 +318,40 @@ class InspectionWebController extends Controller
             ->get();
 
         return view('dashboard.inspections.compare', compact('current', 'baseline', 'comparison', 'availableBaselines'));
+    }
+
+    public function assign(Request $request, int $id): RedirectResponse
+    {
+        $user = Auth::user();
+        $inspection = Inspection::findOrFail($id);
+
+        $request->validate([
+            'inspector_id' => 'required|exists:users,id',
+        ]);
+
+        try {
+            $this->inspectionService->assignInspector($inspection, (int) $request->inspector_id, $user);
+            return back()->with('success', 'Inspektor berhasil ditugaskan.');
+        } catch (DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function reschedule(Request $request, int $id): RedirectResponse
+    {
+        $user = Auth::user();
+        $inspection = Inspection::findOrFail($id);
+
+        $request->validate([
+            'scheduled_date' => 'required|date',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $this->inspectionService->rescheduleInspection($inspection, $request->scheduled_date, $request->reason, $user);
+            return back()->with('success', 'Jadwal inspeksi kamar berhasil diperbarui.');
+        } catch (DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }

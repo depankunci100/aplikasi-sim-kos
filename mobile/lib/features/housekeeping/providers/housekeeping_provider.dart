@@ -94,7 +94,8 @@ final housekeepingDetailProvider = FutureProvider.family<HousekeepingTaskModel, 
 
 class HousekeepingServiceNotifier {
   final ApiClient apiClient;
-  HousekeepingServiceNotifier(this.apiClient);
+  final Ref? ref;
+  HousekeepingServiceNotifier(this.apiClient, [this.ref]);
 
   Future<bool> startTask(int id) async {
     try {
@@ -137,9 +138,49 @@ class HousekeepingServiceNotifier {
       return false;
     }
   }
+
+  Future<bool> approveTask(int id, {String? feedback}) async {
+    try {
+      final response = await apiClient.dio.post(
+        '${ApiEndpoints.housekeeping}/$id/approve',
+        data: {
+          if (feedback != null && feedback.isNotEmpty) 'feedback': feedback,
+        },
+      );
+      if (response.data['success'] == true) {
+        ref?.invalidate(housekeepingListProvider);
+        ref?.invalidate(housekeepingDetailProvider(id));
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> requestRevision(int id, {required String reason, List<String>? problematicItems}) async {
+    try {
+      final response = await apiClient.dio.post(
+        '${ApiEndpoints.housekeeping}/$id/request-revision',
+        data: {
+          'reason': reason,
+          if (problematicItems != null && problematicItems.isNotEmpty)
+            'problematic_items': problematicItems,
+        },
+      );
+      if (response.data['success'] == true) {
+        ref?.invalidate(housekeepingListProvider);
+        ref?.invalidate(housekeepingDetailProvider(id));
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 final housekeepingServiceProvider = Provider<HousekeepingServiceNotifier>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return HousekeepingServiceNotifier(apiClient);
+  return HousekeepingServiceNotifier(apiClient, ref);
 });

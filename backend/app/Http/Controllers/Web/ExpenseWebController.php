@@ -245,7 +245,16 @@ class ExpenseWebController extends Controller
             abort(404, 'Bukti kuitansi/transaksi tidak ditemukan.');
         }
 
-        return response()->file(Storage::path($expense->receipt_photo));
+        $fullPath = Storage::path($expense->receipt_photo);
+        $mimeType = Storage::mimeType($expense->receipt_photo) ?? 'image/jpeg';
+
+        $fileResponse = response()->file($fullPath, [
+            'Content-Type' => $mimeType,
+        ]);
+        $fileResponse->setPrivate();
+        $fileResponse->headers->addCacheControlDirective('no-cache', true);
+
+        return $fileResponse;
     }
 
     public function paymentProof(Request $request, int $id, int $paymentId): BinaryFileResponse
@@ -260,7 +269,16 @@ class ExpenseWebController extends Controller
             abort(404, 'Bukti pembayaran tidak ditemukan.');
         }
 
-        return response()->file(Storage::path($payment->proof_file));
+        $fullPath = Storage::path($payment->proof_file);
+        $mimeType = Storage::mimeType($payment->proof_file) ?? 'image/jpeg';
+
+        $fileResponse = response()->file($fullPath, [
+            'Content-Type' => $mimeType,
+        ]);
+        $fileResponse->setPrivate();
+        $fileResponse->headers->addCacheControlDirective('no-cache', true);
+
+        return $fileResponse;
     }
 
     public function categories(Request $request)

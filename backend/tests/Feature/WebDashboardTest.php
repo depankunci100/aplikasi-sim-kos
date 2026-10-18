@@ -222,4 +222,71 @@ class WebDashboardTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_owner_can_see_occupancy_calendar_on_dashboard(): void
+    {
+        $response = $this->actingAs($this->owner)->get('/dashboard');
+
+        $response->assertStatus(200)
+            ->assertSee('Kalender Okupansi')
+            ->assertSee('Masih Ada Slot')
+            ->assertSee('Sudah Full (Penuh)')
+            ->assertSee('Akan Checkout');
+    }
+
+    public function test_owner_can_navigate_month_via_web_parameter(): void
+    {
+        $response = $this->actingAs($this->owner)->get('/dashboard?month=2026-12');
+
+        $response->assertStatus(200)
+            ->assertSee('Desember 2026');
+    }
+
+    public function test_user_can_fetch_calendar_occupancy_data_via_ajax(): void
+    {
+        $response = $this->actingAs($this->owner)->getJson('/dashboard/calendar-data?month=2026-11&property_id=' . $this->property->id);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.month_label', 'November 2026')
+            ->assertJsonPath('data.total_rooms', 1);
+    }
+
+    public function test_calendar_correctly_calculates_slots_and_upcoming_checkout(): void
+    {
+        // Buat booking aktif yang berakhir pada 2026-11-15 (akan checkout pada tanggal ini)
+        $tenant = User::factory()->create(['role' => Role::TENANT]);
+        $room = Room::where('property_id', $this->property->id)->first();
+
+        Booking::create([
+            'booking_code' => 'BK-TEST-CAL-CHECKOUT',
+            'property_id' => $this->property->id,
+            'room_id' => $room->id,
+            'user_id' => $tenant->id,
+            'rental_type' => 'monthly',
+            'start_date' => '2026-11-01',
+            'end_date' => '2026-11-15',
+            'rate_amount' => 1000000,
+            'status' => BookingStatus::ACTIVE,
+        ]);
+
+        $response = $this->actingAs($this->owner)->getJson('/dashboard/calendar-data?month=2026-11&property_id=' . $this->property->id);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        $days = $response->json('data.days');
+        
+        // Pada 2026-11-10: kamar terisi penuh (karena total kamar = 1, terisi = 1) -> status 'full'
+        $this->assertEquals('full', $days['2026-11-10']['status']);
+        $this->assertEquals(0, $days['2026-11-10']['available_count']);
+
+        // Pada 2026-11-15: kamar akan checkout -> checkouts_count = 1
+        $this->assertEquals(1, $days['2026-11-15']['checkouts_count']);
+        $this->assertEquals('checkout', $days['2026-11-15']['rooms'][0]['status']);
+
+        // Pada 2026-11-20: booking sudah selesai -> kamar tersedia -> status 'available'
+        $this->assertEquals('available', $days['2026-11-20']['status']);
+        $this->assertEquals(1, $days['2026-11-20']['available_count']);
+    }
 }

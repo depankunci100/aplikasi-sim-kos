@@ -224,9 +224,9 @@ class InspectionService
     /**
      * Penyewa mengajukan keberatan / tanggapan atas hasil inspeksi
      */
-    public function tenantObject(Inspection $inspection, string $objectionNotes, User $tenant): Inspection
+    public function tenantObject(Inspection $inspection, string $objectionNotes, User $tenant, ?array $problematicItems = null): Inspection
     {
-        return DB::transaction(function () use ($inspection, $objectionNotes, $tenant) {
+        return DB::transaction(function () use ($inspection, $objectionNotes, $tenant, $problematicItems) {
             $locked = Inspection::lockForUpdate()->findOrFail($inspection->id);
 
             if (!$locked->tenant_id || $locked->tenant_id !== $tenant->id) {
@@ -237,15 +237,129 @@ class InspectionService
                 throw new DomainException("Keberatan hanya dapat diajukan pada inspeksi yang telah diselesaikan petugas.");
             }
 
+            $feedbackText = $objectionNotes;
+            if (!empty($problematicItems)) {
+                $feedbackText .= ' [Item bermasalah: ' . implode(', ', $problematicItems) . ']';
+            }
+
             $locked->update([
                 'status' => InspectionStatus::OBJECTED_BY_TENANT->value,
-                'tenant_feedback' => $objectionNotes,
+                'tenant_feedback' => $feedbackText,
                 'tenant_decision_at' => now(),
             ]);
 
-            $this->logAction($locked, $tenant, 'tenant_objected', "Penyewa mengajukan keberatan: {$objectionNotes}");
+            $this->logAction($locked, $tenant, 'tenant_objected', "Penyewa mengajukan keberatan: {$feedbackText}", [
+                'problematic_items' => $problematicItems,
+            ]);
+
+            // Beri notifikasi ke staf dan manajer
+            $notificationService = app(\App\Services\Notification\NotificationService::class);
+            $supervisors = DB::table('property_users')
+                ->where('property_id', $locked->property_id)
+                ->whereIn('role', ['owner', 'manager'])
+                ->pluck('user_id');
+
+            foreach ($supervisors as $supId) {
+                $notificationService->createNotification(
+                    user: $supId,
+                    type: 'inspection_objected',
+                    title: "Keberatan Hasil Inspeksi: {$locked->inspection_code}",
+                    message: "Penyewa {$tenant->name} mengajukan keberatan: {$objectionNotes}",
+                    data: ['inspection_id' => $locked->id],
+                    propertyId: $locked->property_id
+                );
+            }
 
             return $locked->fresh();
+        });
+    }
+
+    /**
+     * Tugaskan inspektor ke pemeriksaan kamar
+     */
+    public function assignInspector(Inspection $inspection, int $inspectorId, User $actor): Inspection
+    {
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Penyewa atau kasir tidak memiliki izin menugaskan inspektor.');
+        }
+
+        if (!$actor->isSuperAdmin()) {
+            $isAuthorized = DB::table('property_users')
+                ->where('property_id', $inspection->property_id)
+                ->where('user_id', $actor->id)
+                ->whereIn('role', ['owner', 'manager', 'receptionist'])
+                ->exists();
+
+            if (!$isAuthorized) {
+                throw new DomainException('Anda tidak memiliki wewenang menugaskan inspektor pada properti ini.');
+            }
+        }
+
+        $inspector = User::findOrFail($inspectorId);
+
+        return DB::transaction(function () use ($inspection, $inspector, $actor) {
+            $prevInspector = $inspection->inspector_id;
+            $inspection->update([
+                'inspector_id' => $inspector->id,
+            ]);
+
+            $this->logAction($inspection, $actor, 'assigned', "Inspektor ditugaskan ke {$inspector->name} oleh {$actor->name}.", [
+                'previous_inspector_id' => $prevInspector,
+                'new_inspector_id' => $inspector->id,
+            ]);
+
+            $notificationService = app(\App\Services\Notification\NotificationService::class);
+            $notificationService->createNotification(
+                user: $inspector->id,
+                type: 'inspection_assigned',
+                title: "Penugasan Inspeksi Kamar",
+                message: "Anda ditugaskan melakukan inspeksi kamar ({$inspection->inspection_code}) pada tanggal {$inspection->scheduled_date->format('Y-m-d')}.",
+                data: [
+                    'inspection_id' => $inspection->id,
+                    'inspection_code' => $inspection->inspection_code,
+                    'action_url' => "/inspections/{$inspection->id}",
+                ],
+                propertyId: $inspection->property_id
+            );
+
+            return $inspection->fresh(['room', 'property', 'inspector', 'tenant']);
+        });
+    }
+
+    /**
+     * Jadwalkan ulang tanggal inspeksi kamar
+     */
+    public function rescheduleInspection(Inspection $inspection, string $newDate, ?string $reason, User $actor): Inspection
+    {
+        if ($actor->isTenant() || $actor->isCashier()) {
+            throw new DomainException('Hanya Pemilik atau Manajer yang dapat menjadwalkan ulang inspeksi.');
+        }
+
+        if (!$actor->isSuperAdmin()) {
+            $isAuthorized = DB::table('property_users')
+                ->where('property_id', $inspection->property_id)
+                ->where('user_id', $actor->id)
+                ->whereIn('role', ['owner', 'manager', 'receptionist'])
+                ->exists();
+
+            if (!$isAuthorized) {
+                throw new DomainException('Anda tidak memiliki wewenang mengubah jadwal pada properti ini.');
+            }
+        }
+
+        if (in_array($inspection->status, [InspectionStatus::COMPLETED, InspectionStatus::APPROVED_BY_TENANT, InspectionStatus::CANCELLED])) {
+            throw new DomainException("Inspeksi dengan status {$inspection->status->label()} tidak dapat dijadwalkan ulang.");
+        }
+
+        return DB::transaction(function () use ($inspection, $newDate, $reason, $actor) {
+            $oldDate = $inspection->scheduled_date ? $inspection->scheduled_date->format('Y-m-d') : '-';
+            $inspection->update([
+                'scheduled_date' => $newDate,
+            ]);
+
+            $this->logAction($inspection, $actor, 'rescheduled', "Jadwal inspeksi diubah dari {$oldDate} ke {$newDate} oleh {$actor->name}. Catatan: " . ($reason ?? '-'));
+
+            return $inspection->fresh();
         });
     }
 
@@ -377,6 +491,149 @@ class InspectionService
             ->where('user_id', $user->id)
             ->whereIn('role', ['owner', 'manager', 'staff'])
             ->exists();
+    }
+
+    /**
+     * Pengajuan Inspeksi Kamar oleh Penyewa (Tenant Request)
+     */
+    public function requestInspection(User $tenant, array $data, array $photos = []): Inspection
+    {
+        if (!$tenant->isTenant()) {
+            throw new DomainException('Hanya penyewa yang dapat mengajukan permohonan inspeksi kamar melalui menu ini.');
+        }
+
+        // Cari booking aktif penyewa
+        $booking = Booking::with(['room.roomType', 'property'])
+            ->where(function ($q) use ($tenant) {
+                $q->where('user_id', $tenant->id)
+                  ->orWhere('guest_email', $tenant->email);
+            })
+            ->whereIn('status', ['confirmed', 'active', 'checked_in'])
+            ->latest('id')
+            ->first();
+
+        if (!$booking || !$booking->room_id) {
+            throw new DomainException('Anda tidak memiliki kamar aktif yang terdaftar untuk mengajukan inspeksi.');
+        }
+
+        $propertyId = $booking->property_id;
+        $roomId = $booking->room_id;
+
+        // Cegah duplikasi pengajuan inspeksi aktif yang belum selesai
+        $existingActive = Inspection::where('room_id', $roomId)
+            ->whereIn('status', [
+                InspectionStatus::SCHEDULED,
+                InspectionStatus::IN_PROGRESS,
+                InspectionStatus::COMPLETED,
+            ])
+            ->exists();
+
+        if ($existingActive) {
+            throw new DomainException('Sudah ada inspeksi aktif atau menunggu respons penyewa untuk kamar Anda. Harap selesaikan inspeksi sebelumnya terlebih dahulu.');
+        }
+
+        $typeVal = $data['type'] ?? 'periodic';
+        $typeEnum = InspectionType::tryFrom($typeVal) ?? InspectionType::PERIODIC;
+        $scheduledDate = $data['scheduled_date'] ?? now()->toDateString();
+        $reason = $data['reason'] ?? 'Pemeriksaan Rutin/Kondisi Kamar';
+        $description = $data['description'] ?? '';
+
+        return DB::transaction(function () use (
+            $tenant,
+            $booking,
+            $propertyId,
+            $roomId,
+            $typeEnum,
+            $scheduledDate,
+            $reason,
+            $description,
+            $photos
+        ) {
+            $inspection = Inspection::create([
+                'inspection_code' => Inspection::generateCode(),
+                'property_id' => $propertyId,
+                'room_id' => $roomId,
+                'booking_id' => $booking->id,
+                'inspector_id' => null,
+                'tenant_id' => $tenant->id,
+                'created_by' => $tenant->id,
+                'type' => $typeEnum,
+                'status' => InspectionStatus::SCHEDULED,
+                'scheduled_date' => $scheduledDate,
+                'inspector_notes' => "[Pengajuan Penyewa] Alasan: {$reason}. Deskripsi: {$description}",
+            ]);
+
+            // Inisialisasi item checklist dari room assets atau default template
+            $roomAssets = RoomAsset::where('room_id', $roomId)->get();
+            if ($roomAssets->isNotEmpty()) {
+                foreach ($roomAssets as $asset) {
+                    InspectionItem::create([
+                        'inspection_id' => $inspection->id,
+                        'room_asset_id' => $asset->id,
+                        'item_name' => $asset->name,
+                        'category' => $asset->category ?? 'general',
+                        'condition' => InspectionItemCondition::GOOD,
+                        'is_acceptable' => true,
+                    ]);
+                }
+            } else {
+                foreach (self::DEFAULT_CHECKLIST_ITEMS as $item) {
+                    InspectionItem::create([
+                        'inspection_id' => $inspection->id,
+                        'item_name' => $item['item_name'],
+                        'category' => $item['category'],
+                        'condition' => InspectionItemCondition::GOOD,
+                        'is_acceptable' => true,
+                    ]);
+                }
+            }
+
+            // Simpan foto pendukung penyewa di private storage jika dilampirkan
+            foreach ($photos as $photo) {
+                if ($photo instanceof UploadedFile && $photo->isValid()) {
+                    $path = $photo->store("inspections/{$inspection->id}", 'local');
+                    InspectionMedia::create([
+                        'inspection_id' => $inspection->id,
+                        'file_path' => $path,
+                        'file_type' => 'photo',
+                        'caption' => 'Foto Lampiran Pengajuan Penyewa',
+                        'uploaded_by' => $tenant->id,
+                    ]);
+                }
+            }
+
+            $this->logAction(
+                $inspection,
+                $tenant,
+                'requested',
+                "Penyewa mengajukan inspeksi kamar ({$typeEnum->label()}). Alasan: {$reason}. Catatan: {$description}"
+            );
+
+            // Beri notifikasi in-app kepada staf & manajer properti
+            $staffUserIds = DB::table('property_users')
+                ->where('property_id', $propertyId)
+                ->pluck('user_id');
+
+            $notificationService = app(\App\Services\Notification\NotificationService::class);
+            $roomNumber = $booking->room->room_number ?? "Kamar {$roomId}";
+
+            foreach ($staffUserIds as $staffId) {
+                $notificationService->createNotification(
+                    user: $staffId,
+                    type: 'inspection_requested',
+                    title: "Pengajuan Inspeksi: Kamar {$roomNumber}",
+                    message: "Penyewa {$tenant->name} mengajukan inspeksi {$typeEnum->label()} untuk tanggal {$scheduledDate}.",
+                    data: [
+                        'inspection_id' => $inspection->id,
+                        'inspection_code' => $inspection->inspection_code,
+                        'action_url' => "/inspections/{$inspection->id}",
+                    ],
+                    propertyId: $propertyId
+                );
+            }
+
+            return $inspection;
+        });
     }
 
     /**

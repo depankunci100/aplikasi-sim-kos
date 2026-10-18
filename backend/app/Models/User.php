@@ -84,10 +84,45 @@ class User extends Authenticatable
         return $this->hasMany(ExpensePayment::class, 'recorded_by');
     }
 
+    public function depositLedgers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DepositLedger::class, 'tenant_id');
+    }
+
+    public function settlements(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CheckOutSettlement::class, 'tenant_id');
+    }
+
     public function hasRole(string ...$roles): bool
     {
         $currentRole = $this->role instanceof Role ? $this->role->value : (string) $this->role;
         return in_array($currentRole, $roles, true);
+    }
+
+    public function canManageFinances(): bool
+    {
+        return $this->hasRole('super_admin', 'owner', 'manager', 'receptionist');
+    }
+
+    public function tenantProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(TenantProfile::class);
+    }
+
+    public function announcementReads(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(AnnouncementRead::class);
+    }
+
+    public function passwordResetLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PasswordResetLog::class);
+    }
+
+    public function bookings(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Booking::class);
     }
 }
 

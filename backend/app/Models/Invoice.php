@@ -55,7 +55,11 @@ class Invoice extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withDefault([
+            'name' => 'Tamu Publik',
+            'email' => '-',
+            'phone' => '-',
+        ]);
     }
 
     public function payments(): HasMany

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/constants/app_colors.dart';
 import '../providers/auth_provider.dart';
 
@@ -24,6 +26,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  void _showServerConfigDialog() {
+    final ipController = TextEditingController(text: ApiEndpoints.baseUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pengaturan IP Server', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Masukkan Base URL backend Laravel Anda agar HP dapat terhubung via Wi-Fi:',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ipController,
+              decoration: const InputDecoration(
+                labelText: 'Base URL',
+                hintText: 'http://192.168.1.12:8000/api/v1',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ipController.text = 'http://192.168.1.12:8000/api/v1';
+            },
+            child: const Text('Reset IP Komputer'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newUrl = ipController.text.trim();
+              if (newUrl.isNotEmpty) {
+                final nav = Navigator.of(ctx);
+                final scaffold = ScaffoldMessenger.of(context);
+                ApiEndpoints.setCustomBaseUrl(newUrl);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('api_base_url', newUrl);
+                if (mounted) {
+                  nav.pop();
+                  scaffold.showSnackBar(
+                    SnackBar(content: Text('Server URL diubah: $newUrl')),
+                  );
+                }
+              }
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _handleLogin() async {
     if (_formKey.currentState?.validate() ?? false) {
       final success = await ref.read(authProvider.notifier).login(
@@ -42,6 +101,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+            tooltip: 'Pengaturan IP Server',
+            onPressed: _showServerConfigDialog,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

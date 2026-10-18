@@ -20,4 +20,15 @@ enum InvoiceStatus: string
             self::CANCELLED => 'Dibatalkan',
         };
     }
+
+    public function badgeClass(): string
+    {
+        return match ($this) {
+            self::UNPAID => 'warning',
+            self::PARTIALLY_PAID => 'info',
+            self::PAID => 'success',
+            self::OVERDUE => 'danger',
+            self::CANCELLED => 'secondary',
+        };
+    }
 }
