@@ -97,6 +97,15 @@ Route::middleware('auth')->prefix('dashboard')->name('dashboard.')->group(functi
         Route::get('/inspections/{id}/compare', [InspectionWebController::class, 'compare'])->name('inspections.compare');
     });
 
+    // Master Gedung / Buildings (Staff, Kasir, Manager, Owner, Super Admin)
+    Route::middleware('role:super_admin,owner,manager,receptionist,staff')->prefix('buildings')->name('buildings.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Web\BuildingWebController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Web\BuildingWebController::class, 'store'])->name('store');
+        Route::put('/{building}', [\App\Http\Controllers\Web\BuildingWebController::class, 'update'])->name('update');
+        Route::post('/{building}/toggle-active', [\App\Http\Controllers\Web\BuildingWebController::class, 'toggleActive'])->name('toggle-active');
+        Route::delete('/{building}', [\App\Http\Controllers\Web\BuildingWebController::class, 'destroy'])->name('destroy');
+    });
+
     // Master Kamar & Unit Hunian (Staff, Kasir, Manager, Owner, Super Admin)
     Route::middleware('role:super_admin,owner,manager,receptionist,staff')->prefix('rooms')->name('rooms.')->group(function () {
         Route::get('/', [RoomWebController::class, 'index'])->name('index');

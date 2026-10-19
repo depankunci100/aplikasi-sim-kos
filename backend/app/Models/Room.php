@@ -17,6 +17,7 @@ class Room extends Model
         'room_type_id',
         'room_number',
         'floor',
+        'building_id',
         'building',
         'size_m2',
         'capacity',
@@ -56,6 +57,19 @@ class Room extends Model
     public function roomType(): BelongsTo
     {
         return $this->belongsTo(RoomType::class);
+    }
+
+    public function buildingMaster(): BelongsTo
+    {
+        return $this->belongsTo(Building::class, 'building_id');
+    }
+
+    /**
+     * Resolusi nama gedung dinamis (prioritas relasi master gedung, fallback string manual)
+     */
+    public function getBuildingNameAttribute(): ?string
+    {
+        return $this->buildingMaster?->name ?? $this->building;
     }
 
     public function bookings(): HasMany

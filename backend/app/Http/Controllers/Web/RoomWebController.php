@@ -50,6 +50,7 @@ class RoomWebController extends Controller
 
         $allowedPropertyIds = $properties->pluck('id')->toArray();
         $roomTypes = RoomType::whereIn('property_id', $allowedPropertyIds)->get();
+        $buildings = \App\Models\Building::whereIn('property_id', $allowedPropertyIds)->active()->orderBy('name')->get();
 
         // Rekapitulasi KPI Kamar
         $counts = [
@@ -61,7 +62,7 @@ class RoomWebController extends Controller
             'inactive' => (clone $this->roomService->getRoomsQuery($user, ['is_active' => 0]))->count(),
         ];
 
-        return view('dashboard.rooms.index', compact('rooms', 'counts', 'properties', 'roomTypes', 'filters'));
+        return view('dashboard.rooms.index', compact('rooms', 'counts', 'properties', 'roomTypes', 'buildings', 'filters'));
     }
 
     /**
@@ -80,6 +81,7 @@ class RoomWebController extends Controller
             'room_type_id' => ['required', 'exists:room_types,id'],
             'room_number' => ['required', 'string', 'max:50'],
             'floor' => ['required', 'integer', 'min:1', 'max:100'],
+            'building_id' => ['nullable', 'exists:buildings,id'],
             'building' => ['nullable', 'string', 'max:50'],
             'size_m2' => ['nullable', 'numeric', 'min:1'],
             'capacity' => ['nullable', 'integer', 'min:1'],
@@ -124,6 +126,7 @@ class RoomWebController extends Controller
         $room = Room::with([
             'property',
             'roomType',
+            'buildingMaster',
             'assets',
             'fixedAssets',
             'bookings' => fn($q) => $q->latest()->take(10),
@@ -141,8 +144,9 @@ class RoomWebController extends Controller
             ? Property::active()->get()
             : $user->properties()->active()->get();
         $roomTypes = RoomType::where('property_id', $room->property_id)->get();
+        $buildings = \App\Models\Building::where('property_id', $room->property_id)->active()->orderBy('name')->get();
 
-        return view('dashboard.rooms.show', compact('room', 'properties', 'roomTypes'));
+        return view('dashboard.rooms.show', compact('room', 'properties', 'roomTypes', 'buildings'));
     }
 
     /**
@@ -162,6 +166,7 @@ class RoomWebController extends Controller
             'room_type_id' => ['sometimes', 'required', 'exists:room_types,id'],
             'room_number' => ['sometimes', 'required', 'string', 'max:50'],
             'floor' => ['sometimes', 'required', 'integer', 'min:1', 'max:100'],
+            'building_id' => ['nullable', 'exists:buildings,id'],
             'building' => ['nullable', 'string', 'max:50'],
             'size_m2' => ['nullable', 'numeric', 'min:1'],
             'capacity' => ['nullable', 'integer', 'min:1'],

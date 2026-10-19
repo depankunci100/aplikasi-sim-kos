@@ -146,6 +146,19 @@
                         <option value="dirty" {{ request('status') === 'dirty' ? 'selected' : '' }}>Kotor</option>
                     </select>
                 </div>
+                @if(isset($buildings) && $buildings->count() > 0)
+                <div class="col-6 col-md-2">
+                    <label class="form-label small fw-semibold text-secondary mb-1">Gedung</label>
+                    <select name="building_id" class="form-select form-select-sm">
+                        <option value="">Semua Gedung</option>
+                        @foreach($buildings as $bld)
+                            <option value="{{ $bld->id }}" {{ request('building_id') == $bld->id ? 'selected' : '' }}>
+                                {{ $bld->name }} ({{ $bld->code }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
                 <div class="col-6 col-md-1">
                     <label class="form-label small fw-semibold text-secondary mb-1">Status Aktif</label>
                     <select name="is_active" class="form-select form-select-sm">
@@ -195,7 +208,7 @@
                                                 Kamar {{ $room->room_number }}
                                             </a>
                                             <div class="small text-muted">
-                                                Lantai {{ $room->floor }} @if($room->building) • Gedung {{ $room->building }} @endif
+                                                Lantai {{ $room->floor }} @if($room->building_name) • Gedung {{ $room->building_name }} @endif
                                             </div>
                                         </div>
                                     </div>
@@ -425,7 +438,19 @@
                 <!-- Gedung / Sayap -->
                 <div class="col-6">
                     <label class="form-label small fw-semibold text-secondary">Gedung / Blok / Sayap</label>
+                    @if(isset($buildings) && $buildings->count() > 0)
+                    <select name="building_id" class="form-select form-select-sm mb-1" id="drawerBuildingSelect" onchange="syncBuildingName(this)">
+                        <option value="">-- Pilih Master Gedung --</option>
+                        @foreach($buildings as $bld)
+                        <option value="{{ $bld->id }}" data-name="{{ $bld->name }}" {{ old('building_id') == $bld->id ? 'selected' : '' }}>
+                            {{ $bld->name }} ({{ $bld->code }})
+                        </option>
+                        @endforeach
+                    </select>
+                    <input type="text" name="building" id="drawerBuildingText" class="form-control form-control-sm" placeholder="Atau ketik nama kustom" value="{{ old('building') }}">
+                    @else
                     <input type="text" name="building" class="form-control form-control-sm" placeholder="Gedung Utama, Blok B" value="{{ old('building') }}">
+                    @endif
                 </div>
                 <!-- Luas Kamar -->
                 <div class="col-6">
@@ -506,3 +531,16 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    function syncBuildingName(select) {
+        const selected = select.options[select.selectedIndex];
+        const name = selected ? selected.getAttribute('data-name') : '';
+        const textInput = document.getElementById('drawerBuildingText');
+        if (textInput && name) {
+            textInput.value = name;
+        }
+    }
+</script>
+@endpush

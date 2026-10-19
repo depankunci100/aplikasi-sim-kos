@@ -67,7 +67,7 @@
             <div class="card border-0 shadow-sm p-3 bg-white">
                 <div class="small text-muted fw-semibold">Properti & Cabang</div>
                 <div class="fw-bold text-dark fs-6 mt-1">{{ $room->property->name }}</div>
-                <div class="small text-muted">Lantai {{ $room->floor }} @if($room->building) (Gedung {{ $room->building }}) @endif</div>
+                <div class="small text-muted">Lantai {{ $room->floor }} @if($room->building_name) (Gedung {{ $room->building_name }}) @endif</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -149,7 +149,7 @@
                                     </tr>
                                     <tr>
                                         <td class="text-muted py-2">Lantai & Gedung</td>
-                                        <td class="py-2">Lantai {{ $room->floor }} @if($room->building) (Gedung {{ $room->building }}) @endif</td>
+                                        <td class="py-2">Lantai {{ $room->floor }} @if($room->building_name) (Gedung {{ $room->building_name }}) @endif</td>
                                     </tr>
                                     <tr>
                                         <td class="text-muted py-2">Luas Kamar</td>
@@ -502,7 +502,19 @@
             <div class="row g-2 mb-3">
                 <div class="col-6">
                     <label class="form-label small fw-semibold text-secondary">Gedung / Blok</label>
+                    @if(isset($buildings) && $buildings->count() > 0)
+                    <select name="building_id" class="form-select form-select-sm mb-1" id="editDrawerBuildingSelect" onchange="syncEditBuildingName(this)">
+                        <option value="">-- Pilih Master Gedung --</option>
+                        @foreach($buildings as $bld)
+                        <option value="{{ $bld->id }}" data-name="{{ $bld->name }}" {{ old('building_id', $room->building_id) == $bld->id ? 'selected' : '' }}>
+                            {{ $bld->name }} ({{ $bld->code }})
+                        </option>
+                        @endforeach
+                    </select>
+                    <input type="text" name="building" id="editDrawerBuildingText" class="form-control form-control-sm" placeholder="Atau ketik nama kustom" value="{{ old('building', $room->building) }}">
+                    @else
                     <input type="text" name="building" class="form-control form-control-sm" value="{{ old('building', $room->building) }}">
+                    @endif
                 </div>
                 <div class="col-6">
                     <label class="form-label small fw-semibold text-secondary">Luas Kamar (m²)</label>
@@ -587,3 +599,16 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    function syncEditBuildingName(select) {
+        const selected = select.options[select.selectedIndex];
+        const name = selected ? selected.getAttribute('data-name') : '';
+        const textInput = document.getElementById('editDrawerBuildingText');
+        if (textInput && name) {
+            textInput.value = name;
+        }
+    }
+</script>
+@endpush

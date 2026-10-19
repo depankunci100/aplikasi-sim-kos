@@ -57,12 +57,21 @@ class RoomService
             $query->where('rooms.is_active', (bool) $filters['is_active']);
         }
 
+        // 6. Filter Building
+        if (!empty($filters['building_id'])) {
+            $query->where('rooms.building_id', $filters['building_id']);
+        }
+
         // 7. Pencarian Text
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
             $query->where(function (Builder $q) use ($search) {
                 $q->where('rooms.room_number', 'like', "%{$search}%")
                     ->orWhere('rooms.building', 'like', "%{$search}%")
+                    ->orWhereHas('buildingMaster', function (Builder $bQ) use ($search) {
+                        $bQ->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
                     ->orWhere('rooms.description', 'like', "%{$search}%")
                     ->orWhereHas('roomType', function (Builder $typeQ) use ($search) {
                         $typeQ->where('name', 'like', "%{$search}%");
@@ -95,13 +104,23 @@ class RoomService
             throw new DomainException("Nomor kamar '{$roomNumber}' sudah terdaftar pada properti ini.");
         }
 
-        return DB::transaction(function () use ($user, $data, $propertyId, $roomNumber) {
+        $buildingId = !empty($data['building_id']) ? (int) $data['building_id'] : null;
+        $buildingName = !empty($data['building']) ? trim($data['building']) : null;
+        if ($buildingId && empty($buildingName)) {
+            $building = \App\Models\Building::find($buildingId);
+            if ($building) {
+                $buildingName = $building->name;
+            }
+        }
+
+        return DB::transaction(function () use ($user, $data, $propertyId, $roomNumber, $buildingId, $buildingName) {
             $room = Room::create([
                 'property_id' => $propertyId,
                 'room_type_id' => (int) $data['room_type_id'],
                 'room_number' => $roomNumber,
                 'floor' => (int) ($data['floor'] ?? 1),
-                'building' => !empty($data['building']) ? trim($data['building']) : null,
+                'building_id' => $buildingId,
+                'building' => $buildingName,
                 'size_m2' => isset($data['size_m2']) && $data['size_m2'] !== '' ? (float) $data['size_m2'] : null,
                 'capacity' => isset($data['capacity']) && $data['capacity'] !== '' ? (int) $data['capacity'] : null,
                 'description' => $data['description'] ?? null,
@@ -176,6 +195,15 @@ class RoomService
             if (isset($data['room_type_id'])) $updatePayload['room_type_id'] = (int) $data['room_type_id'];
             if (isset($data['room_number'])) $updatePayload['room_number'] = trim($data['room_number']);
             if (isset($data['floor'])) $updatePayload['floor'] = (int) $data['floor'];
+            if (array_key_exists('building_id', $data)) {
+                $updatePayload['building_id'] = !empty($data['building_id']) ? (int) $data['building_id'] : null;
+                if (!empty($updatePayload['building_id']) && empty($data['building'])) {
+                    $b = \App\Models\Building::find($updatePayload['building_id']);
+                    if ($b) {
+                        $updatePayload['building'] = $b->name;
+                    }
+                }
+            }
             if (array_key_exists('building', $data)) $updatePayload['building'] = !empty($data['building']) ? trim($data['building']) : null;
             if (array_key_exists('size_m2', $data)) $updatePayload['size_m2'] = $data['size_m2'] !== '' && $data['size_m2'] !== null ? (float) $data['size_m2'] : null;
             if (array_key_exists('capacity', $data)) $updatePayload['capacity'] = $data['capacity'] !== '' && $data['capacity'] !== null ? (int) $data['capacity'] : null;

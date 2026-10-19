@@ -483,6 +483,10 @@
                 <div class="sidebar-section-title">Operasional Sewa</div>
                 <nav class="nav flex-column">
                     @if(auth()->user()->hasRole('super_admin', 'owner', 'manager', 'receptionist', 'staff'))
+                    <a class="sidebar-link {{ request()->routeIs('dashboard.buildings.*') ? 'active' : '' }}" href="{{ route('dashboard.buildings.index') }}">
+                        <i class="bi bi-building link-icon"></i>
+                        <span>Master Gedung</span>
+                    </a>
                     <a class="sidebar-link {{ request()->routeIs('dashboard.rooms.*') ? 'active' : '' }}" href="{{ route('dashboard.rooms.index') }}">
                         <i class="bi bi-door-open link-icon"></i>
                         <span>Master Kamar</span>
